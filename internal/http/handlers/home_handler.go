@@ -193,7 +193,7 @@ func (h *HomeHandler) Zula(w http.ResponseWriter, r *http.Request) {
         user, pass, ok := r.BasicAuth()
         
         // DİKKAT: KULLANICI ADI VE ŞİFREYİ BURAYA YAZ (Örn: hidir / kedi123)
-        if !ok || user != "hidir" || pass != "kedi123" {
+        if !ok || user !=  ***** || pass != ***** {
             w.Header().Set("WWW-Authenticate", `Basic realm="Gizli Operasyon Paneli"`)
             http.Error(w, "Sisteme sızma girişimi engellendi. Yetkiniz yok.", http.StatusUnauthorized)
             return
