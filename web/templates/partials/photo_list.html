@@ -1,0 +1,36 @@
+{{ define "zula" }}
+<header>
+  <h1>Arşiv.</h1>
+  <a href="/" class="zula-link">Fotoğraflara dön</a>
+</header>
+
+<section id="zula-icerik">
+  <p>> Sistemde kayıtlı toplam veri: {{ len .Photos }} dosya</p>
+
+  {{ if .Photos }}
+    <div class="zula-grid">
+      {{ range $index, $photo := .Photos }}
+        <div class="zula-kutu">
+        <a href="/?kedi={{ $photo.ID }}" title="Fotoğraflarda Görüntüle">
+          <img src="/images/{{ $photo.Filename }}">           
+         </a>
+          <div class="zula-meta">
+            <p class="kedi-isim">> Kedi #{{ add $index 1 }}</p>
+            {{ if $.AdminMode }}
+              <button
+                type="button"
+                class="btn-terminal btn-delete"
+                hx-delete="/cat/delete/{{ $photo.ID }}?mode=root"
+                hx-target="closest .zula-kutu"
+                hx-swap="outerHTML"
+              >[X]</button>
+            {{ end }}
+          </div>
+        </div>
+      {{ end }}
+    </div>
+  {{ else }}
+    <p>[!] Veritabanında hiç kedi bulunamadı.</p>
+  {{ end }}
+</section>
+{{ end }}

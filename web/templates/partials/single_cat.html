@@ -1,0 +1,21 @@
+{{ define "single_cat" }}
+<div class="kedi-cerceve">
+<img src="/images/{{ .Photo.Filename }}">
+</div>
+
+<p class="kedi-isim">> Kedi #{{ .Rank }} / {{ .Total }}</p>
+
+<div class="kontrol-paneli">
+  <button class="btn-terminal" hx-get="/cat/prev?id={{ .Photo.ID }}" hx-target="#kedi-sahnesi" hx-swap="innerHTML">
+    [ <<< ]
+  </button>
+  
+  <button class="btn-terminal" hx-get="/cat/random" hx-target="#kedi-sahnesi" hx-swap="innerHTML">
+    [ RASTGELE ]
+  </button>
+  
+  <button class="btn-terminal" hx-get="/cat/next?id={{ .Photo.ID }}" hx-target="#kedi-sahnesi" hx-swap="innerHTML">
+    [ >>> ]
+  </button>
+</div>
+{{ end }}

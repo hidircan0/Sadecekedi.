@@ -1,0 +1,32 @@
+{{ define "content" }}
+<header>
+  <h1>SadeceKedi.</h1>
+  <a href="/zula" class="zula-link">Arşive gir</a>
+</header>
+
+<div id="kedi-sahnesi" 
+     {{ if .TargetKediID }}
+       hx-get="/cat/load?id={{ .TargetKediID }}" 
+     {{ else }}
+       hx-get="/cat/random" 
+     {{ end }}
+     hx-trigger="load">
+     
+  <p>Yapay Zeka Arşivden Kedi Çekiyor...</p>
+</div>
+
+<div class="gumruk-kapisi">
+  <p><b>[+] SİSTEME YENİ VERİ GİR (Sadece Kedi)</b></p>
+  <form
+    hx-post="/upload"
+    hx-target="#upload-mesaj"
+    hx-swap="innerHTML"
+    enctype="multipart/form-data"
+  >
+    <input type="file" name="cat_photo" accept="image/*" required>
+    <button type="submit" class="btn-terminal">Yükle ve Doğrula</button>
+  </form>
+  
+  <div id="upload-mesaj"></div>
+</div>
+{{ end }}

@@ -1,0 +1,18 @@
+# Şifreler
+.env
+*.env
+
+# Go
+/bin/
+main
+*.exe
+
+# Python & YOLO
+__pycache__/
+*.pt
+venv/
+
+# Veri
+minio_data/
+pgdata/
+

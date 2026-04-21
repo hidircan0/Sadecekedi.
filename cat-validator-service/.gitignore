@@ -1,0 +1,15 @@
+# Python Gereksizleri
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+lib/
+lib64/
+
+# YOLO / PyTorch Modelleri (Boyutları çok büyüktür, repoyu şişirir)
+*.pt
+*.pth
+runs/      
+predict/   

@@ -1,0 +1,51 @@
+version: '3.8'
+services:
+  backend:
+    build: .
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+      - minio
+    environment:
+      # İşte doğru ve temiz URL! (Sondaki /validate çok önemli)
+      - CAT_VALIDATOR_URL=http://cat-validator:8000
+      - DATABASE_URL=host=postgres user=${DB_USER} password=${DB_PASS} dbname=kedi_db port=5432 sslmode=disable TimeZone=UTC
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
+      - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
+      - MINIO_BUCKET=cats
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=${DB_USER}
+      - POSTGRES_PASSWORD=${DB_PASS}
+      - POSTGRES_DB=kedi_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=${MINIO_ROOT_USER}
+      - MINIO_ROOT_PASSWORD=${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  cat-validator:
+    build: ./cat-validator-service
+    restart: always
+    ports:
+      - "8000:8000"
+
+volumes:
+  postgres_data:
+  minio_data:

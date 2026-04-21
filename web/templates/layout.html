@@ -1,0 +1,75 @@
+{{ define "layout" }}
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SadeceKedi.</title>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/htmx/1.9.12/htmx.min.js"></script>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div id="protokol-perde" style="display: none;">
+    <div class="protokol-pencere">
+      <h2 class="uyari-baslik">[!] ERİŞİM VE GÜVENLİK PROTOKOLÜ</h2>
+      
+      <div class="protokol-metin">
+        <p>> <b>VERİ GİRİŞİ:</b> Bu sisteme fotoğraf yükleyerek, görseldeki tüm sorumluluğu üstlenmiş sayılırsınız.</p>
+        <p>> <b>GİZLİLİK:</b> Fotoğrafların arka planında yer alan şahsi bilgiler, insan yüzleri veya özel mülk görsellerinden doğacak yasal süreçlerde "SadeceKedi" arşivi sorumluluk kabul etmez.</p>
+        <p>> <b>ORGANİK YAŞAM:</b> Sistem sadece kedi formlarını işlemek üzere tasarlanmıştır. İnsan unsuru barındıran görseller sistem ihlali sayılabilir.</p>
+        <p><b>SİSTEM HAKKINDA:</b> Sistem kedi fotoğraflardan kedileri algılayabileceği kadarıyla geçerlidir. Eğer fotoğrafınız yeterince kedi değilse kabul edilmeyecektir. Kaldırılmasını istediğiniz fotoğraflar için iletişime geçebilirsiniz.</p>
+      </div>
+
+      <button id="btn-protokol-onay" class="btn-terminal">
+        [ PROTOKOLÜ OKUDUM, ŞARTLARI KABUL EDİYORUM ]
+      </button>
+      
+      <p class="gelistirici-imza">Sistem Geliştirici: Hıdırcan Aslan</p>
+    </div>
+  </div>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const perde = document.getElementById("protokol-perde");
+      const onayBtn = document.getElementById("btn-protokol-onay");
+      const gosterBtn = document.getElementById("riza-metni-goster");
+
+      // OTURUM HAFIZASI (Session Storage): Sekme kapanana kadar hatırlar.
+      // Zula'ya geçişlerde tekrar sormaz. Sekme kapanıp açılınca tekrar sorar.
+      if (!sessionStorage.getItem("sistem_onayi")) {
+        perde.style.display = "flex";
+        document.body.style.overflow = "hidden"; 
+      }
+
+      onayBtn.addEventListener("click", () => {
+        sessionStorage.setItem("sistem_onayi", "true");
+        perde.style.display = "none";
+        document.body.style.overflow = "auto";
+      });
+
+      if (gosterBtn) {
+        gosterBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          perde.style.display = "flex";
+          document.body.style.overflow = "hidden";
+        });
+      }
+    });
+  </script>
+
+  <main class="container">
+    {{ if .IsZulaPage }}
+      {{ template "zula" . }}
+    {{ else }}
+      {{ template "content" . }}
+    {{ end }}
+  </main>
+
+  <footer class="terminal-footer">
+      <p>> Sistem V1.0 | Geliştirici: Hıdırcan Aslan</p> <p>İletişim:hidircanaslan1@gmail.com</p>
+      <p>> <a href="#" id="riza-metni-goster">[ Açık Rıza ve Güvenlik Protokolü ]</a></p>
+  </footer>
+</body>
+</html>
+{{ end }}
