@@ -15,7 +15,7 @@ jobs:
           username: azureuser
           key: ${{ secrets.AZURE_SSH_KEY }}
           script: |
-            cd ~/Sadecekedi
+            cd ~/Sadecekedi.
             git pull origin main
             docker compose down
             docker compose up -d --build
