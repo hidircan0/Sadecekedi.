@@ -16,6 +16,8 @@ services:
       - MINIO_ACCESS_KEY=${MINIO_ROOT_USER}
       - MINIO_SECRET_KEY=${MINIO_ROOT_PASSWORD}
       - MINIO_BUCKET=cats
+      - ADMIN_USER=${ADMIN_USER}
+      - ADMIN_PASS=${ADMIN_PASS}
 
   postgres:
     image: postgres:15-alpine
