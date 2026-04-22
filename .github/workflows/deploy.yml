@@ -19,3 +19,4 @@ jobs:
             git pull origin main
             docker compose down
             docker compose up -d --build
+# CI/CD sistemini zorla tetiklemek icin eklendi
