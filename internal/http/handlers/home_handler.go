@@ -226,7 +226,7 @@ func (h *HomeHandler) Delete(w http.ResponseWriter, r *http.Request) {
     user, pass, ok := r.BasicAuth()
     expectedUser := os.Getenv("ADMIN_USER")
     expectedPass := os.Getenv("ADMIN_PASS")
-    if !ok || user != *expectedUser|| pass != expectedPass {
+    if !ok || user != expectedUser|| pass != expectedPass {
         http.Error(w, "Yetkisiz silme girişimi!", http.StatusForbidden)
         return
     }
