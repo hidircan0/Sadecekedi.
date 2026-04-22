@@ -31,13 +31,13 @@ func main() {
     dsn := getenvOrDefault("DATABASE_URL", "") 
     minioAccessKey := getenvOrDefault("MINIO_ACCESS_KEY", "")
     minioSecretKey := getenvOrDefault("MINIO_SECRET_KEY", "")
-    
-    // Az önce bahsettiğin senin özel Site İçi Root Şifren
+
+    adminUser := getenvOrDefault("ADMIN_USER", "")
     adminPass := getenvOrDefault("ADMIN_PASS", "")
 
     // GÜVENLİK DUVARI (Fail-Fast Koruması)
     // Eğer env dosyasından şifreler gelmezse, uydurma şifreyle çalışmaya kalkmasın, direkt sistemi durdursun!
-    if dsn == "" || minioSecretKey == "" || adminPass == "" {
+    if dsn == "" || minioSecretKey == "" || adminUser == "" || adminPass == "" {
         log.Fatal("KRITIK SIZINTI ÖNLENDİ: Veritabanı, MinIO veya Admin şifresi eksik! Sunucu durduruluyor. Lütfen .env dosyanı kontrol et.")
     }
 

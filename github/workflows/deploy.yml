@@ -1,0 +1,21 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [ main ] # Sadece main'e push atınca çalışır
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Azure Sunucusuna SSH ile Bağlan ve Güncelle
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.AZURE_IP }}
+          username: azureuser
+          key: ${{ secrets.AZURE_SSH_KEY }}
+          script: |
+            cd ~/Sadecekedi
+            git pull origin main
+            docker compose down
+            docker compose up -d --build

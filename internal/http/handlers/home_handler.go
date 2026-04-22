@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
     "strings"
-
+    "os"
 	"cat-uploader-go/internal/app"
 	"cat-uploader-go/internal/domain"
 )
@@ -191,9 +191,12 @@ func (h *HomeHandler) Zula(w http.ResponseWriter, r *http.Request) {
     // GÜVENLİK DUVARI: Biri root olmak isterse kimlik sor!
     if r.URL.Query().Get("mode") == "root" {
         user, pass, ok := r.BasicAuth()
+
+        expectedUser := os.Getenv("ADMIN_USER")
+        expectedPass := os.Getenv("ADMIN_PASS")
         
         // DİKKAT: KULLANICI ADI VE ŞİFREYİ BURAYA YAZ (Örn: hidir / kedi123)
-        if !ok || user !=  ***** || pass != ***** {
+        if !ok || user !=  expectedUser|| pass != expectedPass {
             w.Header().Set("WWW-Authenticate", `Basic realm="Gizli Operasyon Paneli"`)
             http.Error(w, "Sisteme sızma girişimi engellendi. Yetkiniz yok.", http.StatusUnauthorized)
             return
@@ -221,7 +224,9 @@ func (h *HomeHandler) Delete(w http.ResponseWriter, r *http.Request) {
 
     // SİLME İŞLEMİ İÇİN KESİN KONTROL (Arka kapıdan istek atılmasını engeller)
     user, pass, ok := r.BasicAuth()
-    if !ok || user != ****** || pass != ***** {
+    expectedUser := os.Getenv("ADMIN_USER")
+    expectedPass := os.Getenv("ADMIN_PASS")
+    if !ok || user != *expectedUser|| pass != expectedPass {
         http.Error(w, "Yetkisiz silme girişimi!", http.StatusForbidden)
         return
     }
