@@ -30,9 +30,6 @@ header {
 
 /* LOGO GRUBU: Başlık ve alt yazıyı sola çivileyen kısım */
 .logo-grubu {
-  display: flex;
-  flex-direction: column; /* İçindekileri zorla alt alta dizer */
-  align-items: flex-start; /* Body'den gelen 'center' emrini burada ezer, SOLA çeker */
   text-align: left;
 }
 
