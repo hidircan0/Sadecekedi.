@@ -70,27 +70,35 @@ func main() {
 	handler := router.NewHandlerSet(service)
 	r := router.New(handler)
 
+	mainHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		// Eğer gelen istek sitemap.xml ise araya gir ve XML dön
+		if req.URL.Path == "/sitemap.xml" {
+			sitemap := `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+   <url>
+      <loc>https://sadecekedi.com.tr/</loc>
+      <lastmod>2026-04-23</lastmod>
+      <changefreq>daily</changefreq>
+      <priority>1.0</priority>
+   </url>
+</urlset>`
+			w.Header().Set("Content-Type", "application/xml")
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(sitemap))
+			return // İşlem bitti, aşağıya inme
+		}
+		
+		// Eğer istek sitemap.xml DEĞİLSE (yani / veya /kediler gibi bir şeyse) 
+		// hiç karışma ve senin kendi router'ına (r) pasla.
+		r.ServeHTTP(w, req)
+	})
+	// 👆👆👆 BİTTİ 👆👆👆
+
 	log.Printf("server listening on %s", addr)
-	if err := http.ListenAndServe(addr, r); err != nil {
+	if err := http.ListenAndServe(addr, mainHandler); err != nil {
 		log.Fatalf("server stopped with error: %v", err)
 	}
-	http.HandleFunc("/sitemap.xml", func(w http.ResponseWriter, r *http.Request) {
-		// Google'ın sevdiği standart sitemap şablonu
-		sitemap := `<?xml version="1.0" encoding="UTF-8"?>
-	<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-	<url>
-		<loc>https://sadecekedi.com.tr/</loc>
-		<lastmod>2026-04-23</lastmod>
-		<changefreq>daily</changefreq>
-		<priority>1.0</priority>
-	</url>
-	</urlset>`
 
-		// İçeriğin XML olduğunu tarayıcıya ve Google'a söylüyoruz
-		w.Header().Set("Content-Type", "application/xml")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte(sitemap))
-	})
 }
 
 func getenvOrDefault(key string, fallback string) string {
