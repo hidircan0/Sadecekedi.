@@ -19,9 +19,9 @@ import (
 )
 
 var (
-	ErrEmptyFile         = errors.New("file is required")
-	ErrInvalidFileType   = errors.New("only image files are accepted")
-	ErrFileNameCollision = errors.New("file name already exists")
+	ErrEmptyFile         = errors.New("Bir fotoğraf yükleyin")
+	ErrInvalidFileType   = errors.New("Sadece fotoğraf yükleyebilirsiniz")
+	ErrFileNameCollision = errors.New("Bu kei hali hazırda sitede kayıtlı!")
 	ErrNotCat            = errors.New("Bu bir kedi değil!")
 )
 

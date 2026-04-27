@@ -15,13 +15,16 @@ async def health_check():
 async def validate_cat(image: UploadFile = File(...)):
     contents = await image.read()
     img = Image.open(io.BytesIO(contents))
-    results = model(img)
+    results = model.predict(img, conf=0.2)
     
     is_cat = False
-    for r in results:
-        for c in r.boxes.cls:
-            label = model.names[int(c)]
-            if label == 'cat':
+   for r in results:
+        for box in r.boxes:
+            label = model.names[int(box.cls)]
+            confidence = float(box.conf) # Güven skoru
+            print(f"Tespit edilen: {label} - Güven Skoru: {confidence}") # Loglara basar
+            
+            if label == 'cat' and confidence > 0.15: # Buradan da kontrol edebilirsin
                 is_cat = True
                 break
                 
