@@ -72,3 +72,4 @@ async def validate_cat(image: UploadFile = File(...)):
         # İşlem bitince geçici dosyayı sunucudan sil ki yer kaplamasın
         if os.path.exists(temp_filename):
             os.remove(temp_filename)
+    #except txt dosyaları için koruma yap (.jpg olupta aslında txt olanlar için)
