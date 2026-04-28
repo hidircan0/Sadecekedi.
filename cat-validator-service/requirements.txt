@@ -7,3 +7,5 @@ torchvision
 python-multipart
 numpy
 opencv-python-headless
+pytesseract==0.3.10
+NudeNet==3.0.9
