@@ -9,7 +9,7 @@ from nudenet import NudeClassifier
 
 app = FastAPI()
 
-model = YOLO("yolo11n.pt") 
+model = YOLO("yolo11m.pt") 
 nsfw_classifier = NudeClassifier() 
 
 BANNED_WORDS = ["satılık", "uyuşturucu", "hap", "numaram", "telegram", "fiyat", "eskort", "dm", "alp bora songül"]
