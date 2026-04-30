@@ -2,13 +2,15 @@ from fastapi import FastAPI, UploadFile, File
 from ultralytics import YOLO
 import io
 import os
-from PIL import Image, UnidentifiedImageError # YENİ: Sahte dosya yakalayıcı zırh eklendi
+import uuid # YENİ: Çarpışma (Race condition) önleyici eklendi
+from PIL import Image, UnidentifiedImageError
 import pytesseract
 import re
 from nudenet import NudeDetector
 
 app = FastAPI()
 
+# MLOps Standartları: Daha keskin model
 model = YOLO("yolo11m.pt") 
 nsfw_detector = NudeDetector()
 
@@ -21,18 +23,24 @@ async def health_check():
 @app.post("/validate")
 async def validate_cat(image: UploadFile = File(...)):
     contents = await image.read()
-    temp_filename = f"temp_{image.filename}"
+    
+    # --- 0. KATMAN: AĞ SAVUNMASI (RACE CONDITION) ---
+    # Her dosyaya benzersiz isim vererek dosyaların birbirini ezmesini engelliyoruz.
+    # Uzantıyı ne olursa olsun .jpg olarak kilitliyoruz.
+    unique_id = uuid.uuid4().hex
+    temp_filename = f"temp_{unique_id}.jpg"
     
     try:
-        # --- 0. KATMAN: SAHTE DOSYA KORUMASI (MAGIC BYTES ARAMASI) ---
-        # Pillow uzantıya değil, dosyanın DNA'sına bakar. Eğer bu bir txt ise,
-        # anında UnidentifiedImageError fırlatır ve kod aşağıya inmeden except bloğuna uçar.
+        # --- 0.5. KATMAN: SAHTE DOSYA KORUMASI VE VERİ STANDARTİZASYONU ---
         img = Image.open(io.BytesIO(contents))
-        img.load() # Görüntüyü tam anlamıyla belleğe alıp kırık/bozuk olmadığını doğrular
+        img.load() 
         
-        # Eğer buraya kadar geldiyse dosya GERÇEKTEN bir fotoğraftır. Şimdi diske yazabiliriz.
-        with open(temp_filename, "wb") as f:
-            f.write(contents)
+        # Format MPO, WEBP, PNG fark etmez, yapay zekanın midesi bulanmasın diye saf RGB yapıyoruz.
+        if img.mode != 'RGB':
+            img = img.convert('RGB')
+            
+        # Orijinal dosyayı (with open...) ile DEĞİL, temizlenmiş halini güvenle diske yazıyoruz.
+        img.save(temp_filename, format="JPEG")
             
         # --- 1. KATMAN: NSFW (UYGUNSUZLUK) KONTROLÜ ---
         nsfw_result = nsfw_detector.detect(temp_filename)
@@ -43,7 +51,8 @@ async def validate_cat(image: UploadFile = File(...)):
                 return {"is_cat": False, "reason": "Uygunsuz içerik tespit edildi!"}
 
         # --- 2. KATMAN: OCR (METİN VE NUMARA AVI) ---
-        extracted_text = pytesseract.image_to_string(img).lower()
+        # Tesseract'ın çökmemesi için bellekteki img objesini değil, diske yazdığımız standart JPG'yi okutuyoruz!
+        extracted_text = pytesseract.image_to_string(temp_filename).lower()
         
         phone_pattern = re.compile(r'\+?\d{10,13}')
         if phone_pattern.search(extracted_text):
@@ -71,17 +80,13 @@ async def validate_cat(image: UploadFile = File(...)):
         return {"is_cat": False, "reason": "Kedi bulunamadı veya görüntü kalitesiz."}
         
     except UnidentifiedImageError:
-        # Arkadaşının denediği o "uzantısı değiştirilmiş .txt" saldırısı tam olarak buraya düşer
         print(f"🚨 SİBER SAVUNMA: Sahte dosya uzantısı engellendi! ({image.filename})")
         return {"is_cat": False, "reason": "Sistemi kandıramazsın, bu geçerli bir fotoğraf değil!"}
         
     except Exception as e:
-        # Sistemin ne olursa olsun çökmesini (HTTP 500) engelleyen ana kalkan
         print(f"🚨 SİSTEM HATASI: Beklenmeyen bir durum oluştu -> {e}")
         return {"is_cat": False, "reason": "Görüntü analiz edilirken sunucuda bir hata oluştu."}
         
     finally:
-        # Kod başarılı da olsa, saldırı da gelse bu blok ÇALIŞMAK ZORUNDADIR. 
-        # Diskte çöp dosya kalmasını engeller.
         if os.path.exists(temp_filename):
             os.remove(temp_filename)
