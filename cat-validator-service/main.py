@@ -5,12 +5,12 @@ import os
 from PIL import Image, UnidentifiedImageError # YENİ: Sahte dosya yakalayıcı zırh eklendi
 import pytesseract
 import re
-from nudenet import NudeClassifier 
+from nudenet import NudeDetector
 
 app = FastAPI()
 
 model = YOLO("yolo11m.pt") 
-nsfw_classifier = NudeClassifier() 
+nsfw_detector = NudeDetector()
 
 BANNED_WORDS = ["satılık", "uyuşturucu", "hap", "numaram", "telegram", "fiyat", "eskort", "dm", "alp bora songül"]
 
@@ -35,11 +35,11 @@ async def validate_cat(image: UploadFile = File(...)):
             f.write(contents)
             
         # --- 1. KATMAN: NSFW (UYGUNSUZLUK) KONTROLÜ ---
-        nsfw_result = nsfw_classifier.classify(temp_filename)
-        if temp_filename in nsfw_result:
-            unsafe_score = nsfw_result[temp_filename].get('unsafe', 0)
-            if unsafe_score > 0.4: 
-                print(f"🚨 GÜVENLİK İHLALİ: NSFW Tespit Edildi! Skor: {unsafe_score}")
+        nsfw_result = nsfw_detector.detect(temp_filename)
+        
+        for detection in nsfw_result:
+            if detection.get('score', 0) > 0.4: 
+                print(f"🚨 GÜVENLİK İHLALİ: NSFW ({detection.get('class')}) Tespit Edildi! Skor: {detection.get('score')}")
                 return {"is_cat": False, "reason": "Uygunsuz içerik tespit edildi!"}
 
         # --- 2. KATMAN: OCR (METİN VE NUMARA AVI) ---
