@@ -54,7 +54,7 @@ async def validate_cat(image: UploadFile = File(...)):
                 return {"is_cat": False, "reason": f"Yasaklı metin tespit edildi!"}
 
         # --- 3. KATMAN: YOLO (KEDİ TESPİTİ) ---
-        results = model.predict(img, conf=0.15) 
+        results = model.predict(temp_filename, conf=0.45) 
         
         is_cat = False
         for r in results:
