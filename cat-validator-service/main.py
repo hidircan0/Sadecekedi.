@@ -3,7 +3,7 @@ from ultralytics import YOLO
 import io
 import os
 import uuid # YENİ: Çarpışma (Race condition) önleyici eklendi
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 import pytesseract
 import re
 from nudenet import NudeDetector
@@ -32,7 +32,11 @@ async def validate_cat(image: UploadFile = File(...)):
     
     try:
         # --- 0.5. KATMAN: SAHTE DOSYA KORUMASI VE VERİ STANDARTİZASYONU ---
-        img = Image.open(io.BytesIO(contents))
+        iimg = Image.open(io.BytesIO(contents))
+        
+        # YENİ: EXIF Kalkanı! Eğer telefondan yan çekilmişse, pikselleri gerçekten düzelt.
+        img = ImageOps.exif_transpose(img)
+        
         img.load() 
         
         # Format MPO, WEBP, PNG fark etmez, yapay zekanın midesi bulanmasın diye saf RGB yapıyoruz.
