@@ -16,6 +16,9 @@ jobs:
           key: ${{ secrets.AZURE_SSH_KEY }}
           script: |
             cd ~/Sadecekedi.
-            git pull origin main
-            docker compose up -d --build
+            git fetch --all
+            git reset --hard origin/main
+            git clean -fd
+            docker compose build --no-cache
+            docker compose up -d --force-recreate
             docker image prune -f
