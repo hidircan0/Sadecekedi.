@@ -11,7 +11,7 @@ from nudenet import NudeDetector
 app = FastAPI()
 
 # MLOps Standartları: Daha keskin model
-model = YOLO("yolo11m.pt") 
+model = YOLO("yolo11s.pt") 
 nsfw_detector = NudeDetector()
 
 BANNED_WORDS = ["satılık", "uyuşturucu", "hap", "numaram", "telegram", "fiyat", "eskort", "dm", "alp bora songül"]
@@ -32,7 +32,7 @@ async def validate_cat(image: UploadFile = File(...)):
     
     try:
         # --- 0.5. KATMAN: SAHTE DOSYA KORUMASI VE VERİ STANDARTİZASYONU ---
-        iimg = Image.open(io.BytesIO(contents))
+        img = Image.open(io.BytesIO(contents))
         
         # YENİ: EXIF Kalkanı! Eğer telefondan yan çekilmişse, pikselleri gerçekten düzelt.
         img = ImageOps.exif_transpose(img)
