@@ -1,4 +1,4 @@
-name: Deploy to Azure
+name: Deploy to Local
 
 on:
   push:
@@ -6,19 +6,15 @@ on:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted # İşte GitHub'ın görselde istediği değişiklik bu!
+
     steps:
-      - name: Azure Sunucusuna SSH ile Bağlan ve Güncelle
-        uses: appleboy/ssh-action@master
-        with:
-          host: ${{ secrets.AZURE_IP }}
-          username: azureuser
-          key: ${{ secrets.AZURE_SSH_KEY }}
-          script: |
-            cd ~/Sadecekedi.
-            git fetch --all
-            git reset --hard origin/main
-            git clean -fd
-            docker compose build --no-cache cat-validator backend
-            docker compose up -d --force-recreate cat-validator backend
-            docker image prune -f
+      - name: Sadecekedi'yi Lokalde Güncelle ve Yeniden Başlat
+        run: |
+          cd ~/Sadecekedi.
+          git fetch --all
+          git reset --hard origin/main
+          git clean -fd
+          docker compose build --no-cache cat-validator backend
+          docker compose up -d --force-recreate cat-validator backend
+          docker image prune -f

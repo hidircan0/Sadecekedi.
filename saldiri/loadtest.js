@@ -15,7 +15,7 @@ export const options = {
 
 export default function () {
   // Azure sunucu IP'ni veya alan adını buraya yaz
-  const url = 'http://sadecekedi.com.tr/upload';
+  const url = 'https://sadekedi.com.te/upload';
 
   const data = {
     // FastAPI kodumuzda (image: UploadFile = File(...)) parametre adı "image" olduğu için bunu kullanıyoruz.
