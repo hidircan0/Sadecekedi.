@@ -1,0 +1,20 @@
+apiVersion: skaffold/v4beta11
+kind: Config
+metadata:
+  name: sadecekedi
+build:
+  local:
+    push: false
+    useDockerCLI: true
+  artifacts:
+    - image: sadecekedi-backend
+      context: .
+      docker:
+        dockerfile: Dockerfile
+    - image: sadecekedi-yolo
+      context: cat-validator-service
+      docker:
+        dockerfile: Dockerfile
+manifests:
+  rawYaml:
+    - k8s/*.yaml

@@ -35,3 +35,6 @@ safe_sleep.sh
 svc.sh
 externals/
 *.log
+
+k8s/01-config-secrets.yaml
+k8s/*secret*.yaml

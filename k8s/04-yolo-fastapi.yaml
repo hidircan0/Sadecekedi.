@@ -1,0 +1,69 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: go-backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: go-backend
+  template:
+    metadata:
+      labels:
+        app: go-backend
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:latest
+          command: ['sh', '-c', 'until nc -z postgres-service 5432; do echo waiting for postgres; sleep 2; done;']
+      containers:
+        - name: go-backend
+          image: docker.io/library/sadecekedi-backend:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8080
+          env:
+            - name: DB_HOST
+              value: "postgres-service"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: sadecekedi-config
+                  key: POSTGRES_DB
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: sadecekedi-secrets
+                  key: DB_USER
+            - name: DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: sadecekedi-secrets
+                  key: DB_PASS
+            - name: MINIO_ENDPOINT
+              value: "minio-service:9000"
+            - name: MINIO_USER
+              valueFrom:
+                secretKeyRef:
+                  name: sadecekedi-secrets
+                  key: MINIO_ROOT_USER
+            - name: MINIO_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: sadecekedi-secrets
+                  key: MINIO_ROOT_PASSWORD
+            - name: YOLO_SERVICE_URL
+              value: "http://kedi-filter-service:8000"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: go-backend-service
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+  selector:
+    app: go-backend

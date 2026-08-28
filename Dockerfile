@@ -2,27 +2,28 @@
 FROM golang:alpine AS builder
 WORKDIR /app
 
-# Önce sadece bağımlılıkları kopyala ve indir (Docker önbelleğini efektif kullanmak için)
+# CA sertifikaları (Go binary'sinin MinIO/HTTPS istekleri için)
+RUN apk add --no-cache ca-certificates
+
+# Önce bağımlılıkları indir (Cache katmanı)
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Tüm kodları ve klasörleri kopyala
+# Kodları kopyala ve statik olarak derle
 COPY . .
-
-# cmd/web içindeki ana uygulamayı derle
-RUN go build -o main ./cmd/web
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o main ./cmd/web
 
 # 2. Çalıştırma Aşaması (Final Image)
 FROM alpine:latest
 WORKDIR /root/
 
-# Derlenen çalıştırılabilir ana dosyayı al
-COPY --from=builder /app/main .
+# HTTPS çağrıları için root sertifikalarını builder'dan aktar
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-# İŞTE BÜYÜK ÇÖZÜM: Bütün "web" klasörünü (static, templates ve partials ile birlikte) olduğu gibi kopyala
+# Binary ve web varlıklarını al
+COPY --from=builder /app/main .
 COPY --from=builder /app/web ./web
 
-# Fotoğrafların kaydedileceği klasörü oluştur
 RUN mkdir -p uploads
 
 EXPOSE 8080
