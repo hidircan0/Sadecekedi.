@@ -4,3 +4,5 @@ tmp
 *.tar
 cat-validator-service
 k8s
+saldiri/
+*.js

@@ -1,11 +1,8 @@
---extra-index-url https://download.pytorch.org/whl/cpu
 fastapi
 uvicorn
 ultralytics
-torch
-torchvision
 python-multipart
-numpy
+numpy<2.0.0
 opencv-python-headless
 pytesseract==0.3.10
 nudenet

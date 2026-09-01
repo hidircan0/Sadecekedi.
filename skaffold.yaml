@@ -6,6 +6,8 @@ build:
   local:
     push: false
     useDockerCLI: true
+    useBuildkit: true
+    concurrency: 2
   tagPolicy:
     envTemplate:
       template: "latest"
@@ -18,10 +20,18 @@ build:
       context: .
       docker:
         dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: "web/**"
+            dest: /root
     - image: docker.io/library/sadecekedi-yolo
       context: cat-validator-service
       docker:
         dockerfile: Dockerfile
+      sync:
+        manual:
+          - src: "*.py"
+            dest: /app
 manifests:
   rawYaml:
     - k8s/00-namespace.yaml
@@ -33,6 +43,11 @@ manifests:
     - k8s/06-ingress.yaml
     - k8s/07-monitoring.yaml
     - k8s/08-cloudflared.yaml
+    - k8s/10-hpa.yaml
+    # 09-nvidia-device-plugin.yaml + nvidia-time-slicing.yaml kube-system'de kalır:
+    #   kubectl apply -f k8s/nvidia-time-slicing.yaml
+    #   kubectl apply -f k8s/09-nvidia-device-plugin.yaml
+    #   kubectl rollout restart daemonset/nvidia-device-plugin-daemonset -n kube-system
 deploy:
   kubectl:
     defaultNamespace: sadecekedi
@@ -54,3 +69,12 @@ portForward:
     resourceName: grafana-service
     port: 3000
     localPort: 3000
+profiles:
+  - name: cpu
+    patches:
+      - op: replace
+        path: /build/artifacts/1/docker/dockerfile
+        value: Dockerfile.cpu
+      - op: replace
+        path: /manifests/rawYaml/4
+        value: k8s/04-yolo-fastapi.cpu.yaml

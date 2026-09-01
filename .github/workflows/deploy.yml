@@ -37,7 +37,7 @@ jobs:
 
       - name: Deploy with Skaffold
         working-directory: ${{ env.DEPLOY_DIR }}
-        run: skaffold run -n "$K8S_NAMESPACE" --cache-artifacts=false
+        run: skaffold run -n "$K8S_NAMESPACE"
 
       - name: Wait for rollouts
         run: |

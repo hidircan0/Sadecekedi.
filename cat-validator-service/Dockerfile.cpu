@@ -1,0 +1,43 @@
+# syntax=docker/dockerfile:1
+# Günlük skaffold için hafif CPU imajı — CUDA yok, dakikalar değil saniyeler.
+FROM python:3.11-slim-bookworm
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN rm -f /etc/apt/apt.conf.d/docker-clean; \
+    echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache; \
+    sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
+    sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get -o Acquire::Retries=5 update && apt-get install -y --no-install-recommends \
+      ca-certificates \
+      libglib2.0-0 \
+      libgl1 \
+      gcc \
+      python3-dev \
+      tesseract-ocr \
+      tesseract-ocr-tur \
+      curl
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
+    pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu && \
+    pip install -r requirements.txt
+
+RUN --mount=type=cache,target=/root/.cache/yolo \
+    if [ -f /root/.cache/yolo/yolo11n.pt ]; then \
+      cp /root/.cache/yolo/yolo11n.pt /app/yolo11n.pt; \
+    else \
+      curl -fsSL -o /app/yolo11n.pt https://github.com/ultralytics/assets/releases/download/v8.3.0/yolo11n.pt; \
+      mkdir -p /root/.cache/yolo && cp /app/yolo11n.pt /root/.cache/yolo/yolo11n.pt; \
+    fi
+
+COPY . .
+
+EXPOSE 8000
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

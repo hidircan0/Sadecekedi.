@@ -1,0 +1,55 @@
+# k3s node'una nvidia.com/gpu kaynağını tanıtır.
+# Skaffold listesinde YOK — namespace kube-system, skaffold -n sadecekedi ile çakışır.
+# Bir kez:
+#   kubectl apply -f k8s/nvidia-time-slicing.yaml
+#   kubectl apply -f k8s/09-nvidia-device-plugin.yaml
+# Image: nvcr.io (Docker Hub'da v0.17 yok). k3s NGC'den çekmekte takılırsa:
+#   docker pull nvcr.io/nvidia/k8s-device-plugin:v0.17.1
+#   docker save nvcr.io/nvidia/k8s-device-plugin:v0.17.1 | sudo k3s ctr images import -
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-device-plugin-daemonset
+  namespace: kube-system
+spec:
+  selector:
+    matchLabels:
+      name: nvidia-device-plugin-ds
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: nvidia-device-plugin-ds
+    spec:
+      runtimeClassName: nvidia
+      priorityClassName: system-node-critical
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+        - name: nvidia-device-plugin-ctr
+          image: nvcr.io/nvidia/k8s-device-plugin:v0.17.1
+          imagePullPolicy: IfNotPresent
+          args:
+            - --config-file=/etc/config/config.yaml
+          env:
+            - name: FAIL_ON_INIT_ERROR
+              value: "false"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: device-plugin
+              mountPath: /var/lib/kubelet/device-plugins
+            - name: plugin-config
+              mountPath: /etc/config
+      volumes:
+        - name: device-plugin
+          hostPath:
+            path: /var/lib/kubelet/device-plugins
+        - name: plugin-config
+          configMap:
+            name: nvidia-device-plugin-config

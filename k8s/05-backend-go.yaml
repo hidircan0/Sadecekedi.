@@ -30,6 +30,13 @@ spec:
               value: "minio-service:9000"
             - name: CAT_VALIDATOR_URL
               value: "http://kedi-filter-service:8000"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
 ---
 apiVersion: v1
 kind: Service

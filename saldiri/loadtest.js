@@ -1,36 +1,39 @@
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 
-// Test için kullanacağımız standart kedi fotoğrafını RAM'e alıyoruz.
-// Script ile aynı klasörde 'test_kedi.jpg' adında bir dosya olmak zorunda!
-const testImage = open('./kopek.jpeg', 'b');
+const TARGET_URL = 'http://127.0.0.1:8080/upload';
+const dogImage = open('./kopek.jpeg', 'b');
 
 export const options = {
   stages: [
-    { duration: '30s', target: 50 },  // 30 saniye içinde 5 eşzamanlı kullanıcıya çık
-    { duration: '1m', target: 20 },  // 1 dakika boyunca 10 kullanıcı aralıksız fotoğraf yüklesin
-    { duration: '30s', target: 0 },  // Son 30 saniyede yükü sıfırla (Soğuma)
+    { duration: '15s', target: 25 },
+    { duration: '30s', target: 50 },
+    { duration: '30s', target: 100 },
+    { duration: '15s', target: 50 },
+    { duration: '10s', target: 0 },
   ],
+  thresholds: {
+    http_req_duration: ['p(95)<1500'], // P95 < 1.5s
+  },
 };
 
 export default function () {
-  // Azure sunucu IP'ni veya alan adını buraya yaz
-  const url = 'https://sadekedi.com.te/upload';
-
-  const data = {
-    // FastAPI kodumuzda (image: UploadFile = File(...)) parametre adı "image" olduğu için bunu kullanıyoruz.
-	cat_photo: http.file(testImage, 'kopek.jpeg', 'image/jpeg'),
+  const payload = {
+    image: http.file(dogImage, 'kopek.jpeg', 'image/jpeg'),
   };
 
-  const res = http.post(url, data);
+  const params = {
+    // 400 ve 422'yi beklenen/başarılı savunma yanıtı say:
+    responseType: 'text',
+    expectedStatuses: [200, 400, 422],
+  };
 
-  // Gelen yanıtların doğruluğunu kontrol ediyoruz
+  const res = http.post(TARGET_URL, payload, params);
+
   check(res, {
-    'Durum kodu 200 mü?': (r) => r.status === 200,
-    'gümrük reddetti mi': (r) => r.body.includes('[!] İHLAL: Bu bir kedi değil!'),
+    'Gümrük Köpeği Reddetti (400/422)': (r) => r.status === 400 || r.status === 422,
+    'Sunucu Hatası Yok (Not 500)': (r) => r.status !== 500,
   });
 
-  // Her fotoğraf yüklendikten sonra sunucuya 1 saniye nefes payı veriyoruz
-  sleep(1);
+  sleep(0.05);
 }
-

@@ -20,35 +20,43 @@ import (
 )
 
 func main() {
-    addr := ":8080"
-    
-    // Tehlikesiz olanlara varsayılan (fallback) değer bırakabilirsin
-    validatorURL := getenvOrDefault("CAT_VALIDATOR_URL", "http://host.docker.internal:8000")    
-    minioEndpoint := getenvOrDefault("MINIO_ENDPOINT", "localhost:9000")
-    minioBucket := getenvOrDefault("MINIO_BUCKET", "cats")
+	addr := ":8080"
 
-    // ŞİFRELER! Fallback kısımlarını tamamen siliyoruz (Boş bırakıyoruz)
-    dsn := getenvOrDefault("DATABASE_URL", "") 
-    minioAccessKey := getenvOrDefault("MINIO_ACCESS_KEY", "")
-    minioSecretKey := getenvOrDefault("MINIO_SECRET_KEY", "")
+	// Ortam değişkenleri
+	validatorURL := getenvOrDefault("CAT_VALIDATOR_URL", "http://host.docker.internal:8000")
+	minioEndpoint := getenvOrDefault("MINIO_ENDPOINT", "localhost:9000")
+	minioBucket := getenvOrDefault("MINIO_BUCKET", "cats")
 
-    adminUser := getenvOrDefault("ADMIN_USER", "")
-    adminPass := getenvOrDefault("ADMIN_PASS", "")
+	dsn := getenvOrDefault("DATABASE_URL", "")
+	minioAccessKey := getenvOrDefault("MINIO_ACCESS_KEY", "")
+	minioSecretKey := getenvOrDefault("MINIO_SECRET_KEY", "")
+	adminUser := getenvOrDefault("ADMIN_USER", "")
+	adminPass := getenvOrDefault("ADMIN_PASS", "")
 
-    // GÜVENLİK DUVARI (Fail-Fast Koruması)
-    // Eğer env dosyasından şifreler gelmezse, uydurma şifreyle çalışmaya kalkmasın, direkt sistemi durdursun!
-    if dsn == "" || minioSecretKey == "" || adminUser == "" || adminPass == "" {
-        log.Fatal("KRITIK SIZINTI ÖNLENDİ: Veritabanı, MinIO veya Admin şifresi eksik! Sunucu durduruluyor. Lütfen .env dosyanı kontrol et.")
-    }
+	// Güvenlik Duvarı
+	if dsn == "" || minioSecretKey == "" || adminUser == "" || adminPass == "" {
+		log.Fatal("KRITIK SIZINTI ÖNLENDİ: Veritabanı, MinIO veya Admin şifresi eksik! Sunucu durduruluyor. Lütfen .env dosyanı kontrol et.")
+	}
 
+	// 1. POSTGRESQL BAĞLANTISI & HAVUZ OPTİMİZASYONU (100 VU İÇİN)
 	db, err := gorm.Open(gormpostgres.Open(dsn), &gorm.Config{})
 	if err != nil {
 		log.Fatalf("failed to connect postgres: %v", err)
 	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("failed to get sql.DB: %v", err)
+	}
+	sqlDB.SetMaxOpenConns(100)           // 100 eşzamanlı sorgu kapasitesi
+	sqlDB.SetMaxIdleConns(50)            // Boşta bekleyen bağlantı havuzu
+	sqlDB.SetConnMaxLifetime(10 * time.Minute)
+
 	if err := db.AutoMigrate(&domain.Photo{}); err != nil {
 		log.Fatalf("failed to migrate photos table: %v", err)
 	}
 
+	// 2. MINIO İSTEMCİSİ
 	minioClient, err := minio.New(minioEndpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(minioAccessKey, minioSecretKey, ""),
 		Secure: false,
@@ -61,17 +69,29 @@ func main() {
 		log.Fatalf("failed to prepare minio bucket: %v", err)
 	}
 
+	// 3. FASTAPI VALIDATOR HTTP CLIENT (FAIL-FAST TIMEOUT)
+	validatorTransport := &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 100,
+		MaxConnsPerHost:     100,
+		IdleConnTimeout:     90 * time.Second,
+	}
+
+	validatorHTTPClient := &http.Client{
+		Transport: validatorTransport,
+		Timeout:   7 * time.Second, // k6 (15s) timeout'a girmeden önce Go hızlıca cevap/hata dönebilsin
+	}
+
 	repo := postgres.NewPhotoRepository(db, minioClient, minioBucket)
 	validator := catvalidator.NewHTTPClient(
 		validatorURL,
-		&http.Client{Timeout: 5 * time.Second},
+		validatorHTTPClient,
 	)
 	service := app.NewPhotoService(repo, validator)
 	handler := router.NewHandlerSet(service)
 	r := router.New(handler)
 
 	mainHandler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-		// Eğer gelen istek sitemap.xml ise araya gir ve XML dön
 		if req.URL.Path == "/sitemap.xml" {
 			sitemap := `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
@@ -85,20 +105,16 @@ func main() {
 			w.Header().Set("Content-Type", "application/xml")
 			w.WriteHeader(http.StatusOK)
 			w.Write([]byte(sitemap))
-			return // İşlem bitti, aşağıya inme
+			return
 		}
-		
-		// Eğer istek sitemap.xml DEĞİLSE (yani / veya /kediler gibi bir şeyse) 
-		// hiç karışma ve senin kendi router'ına (r) pasla.
+
 		r.ServeHTTP(w, req)
 	})
-	// 👆👆👆 BİTTİ 👆👆👆
 
 	log.Printf("server listening on %s", addr)
 	if err := http.ListenAndServe(addr, mainHandler); err != nil {
 		log.Fatalf("server stopped with error: %v", err)
 	}
-
 }
 
 func getenvOrDefault(key string, fallback string) string {
@@ -122,16 +138,16 @@ func ensureBucketReady(ctx context.Context, client *minio.Client, bucket string)
 	}
 
 	policy := fmt.Sprintf(`{
-		"Version":"2012-10-17",
-		"Statement":[
-			{
-				"Effect":"Allow",
-				"Principal":{"AWS":["*"]},
-				"Action":["s3:GetObject"],
-				"Resource":["arn:aws:s3:::%s/*"]
-			}
-		]
-	}`, bucket)
+        "Version":"2012-10-17",
+        "Statement":[
+            {
+                "Effect":"Allow",
+                "Principal":{"AWS":["*"]},
+                "Action":["s3:GetObject"],
+                "Resource":["arn:aws:s3:::%s/*"]
+            }
+        ]
+    }`, bucket)
 
 	if err := client.SetBucketPolicy(ctx, bucket, policy); err != nil {
 		return fmt.Errorf("set bucket public policy: %w", err)

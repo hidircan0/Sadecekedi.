@@ -1,0 +1,19 @@
+# kube-system — Skaffold'a ekleme. Plugin ile birlikte bir kez apply et:
+#   kubectl apply -f k8s/nvidia-time-slicing.yaml
+#   kubectl apply -f k8s/09-nvidia-device-plugin.yaml
+#   kubectl rollout restart daemonset/nvidia-device-plugin-daemonset -n kube-system
+#
+# Tek fiziksel GPU, 4 time-slice. cat-validator replica sayısı 2 (6GB VRAM).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nvidia-device-plugin-config
+  namespace: kube-system
+data:
+  config.yaml: |
+    version: v1
+    sharing:
+      timeSlicing:
+        resources:
+          - name: nvidia.com/gpu
+            replicas: 4

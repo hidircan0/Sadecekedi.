@@ -55,12 +55,21 @@ cd sadecekedi
 # k8s/01-config-secrets.yaml oluştur, değerleri doldur
 ```
 
-**3. Tüm stack:**
+**3. Stack:**
+
+Günlük UI / Go işi (hafif CPU validator, `main.py` hot-reload):
 ```bash
-skaffold dev -n sadecekedi --cache-artifacts=false
+skaffold dev -n sadecekedi -p cpu
 ```
 
-Namespace, secrets, build, k3s import ve deploy tek komutta. Port forward: 8080 (backend), 8000 (validator), 9001 (minio console), 3000 (grafana).
+GPU (CUDA YOLO) — ilk build uzun, sonrakiler cache + skip import:
+```bash
+skaffold dev -n sadecekedi
+```
+
+`--cache-artifacts=false` kullanma; YOLO katmanlarını her seferinde yeniden kurar.
+
+Port forward: 8080 (backend), 8000 (validator), 9001 (minio), 3000 (grafana).
 
 **Local Development (Go Backend Only):**
 ```bash
