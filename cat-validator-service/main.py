@@ -11,7 +11,7 @@ from nudenet import NudeDetector
 app = FastAPI()
 
 # MLOps Standartları: Daha keskin model
-model = YOLO("yolo11s.pt") 
+model = YOLO("yolo11n.pt") 
 nsfw_detector = NudeDetector()
 
 BANNED_WORDS = ["satılık", "uyuşturucu", "hap", "numaram", "telegram", "fiyat", "eskort", "dm", "alp bora songül"]

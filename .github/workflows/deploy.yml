@@ -1,20 +1,61 @@
-name: Deploy to Local
+name: CD — Deploy
 
 on:
-  push:
-    branches: [ main ] # Sadece main'e push atınca çalışır
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+
+concurrency:
+  group: deploy-main
+  cancel-in-progress: false
 
 jobs:
   deploy:
-    runs-on: self-hosted # İşte GitHub'ın görselde istediği değişiklik bu!
-
+    name: Deploy to Kubernetes (self-hosted)
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: self-hosted
+    env:
+      DEPLOY_DIR: /home/hidircan/Sadecekedi.
+      K8S_NAMESPACE: sadecekedi
     steps:
-      - name: Sadecekedi'yi Lokalde Güncelle ve Yeniden Başlat
+      - name: Sync code to deploy directory
         run: |
-          cd ~/Sadecekedi.
-          git fetch --all
-          git reset --hard origin/main
-          git clean -fd
-          docker compose build --no-cache cat-validator backend
-          docker compose up -d --force-recreate cat-validator backend
-          docker image prune -f
+          mkdir -p "$DEPLOY_DIR"
+          git --git-dir="$DEPLOY_DIR/.git" --work-tree="$DEPLOY_DIR" fetch origin main
+          git --git-dir="$DEPLOY_DIR/.git" --work-tree="$DEPLOY_DIR" checkout -f main
+          git --git-dir="$DEPLOY_DIR/.git" --work-tree="$DEPLOY_DIR" reset --hard "${{ github.event.workflow_run.head_sha }}"
+
+      - name: Verify k8s secrets exist
+        working-directory: ${{ env.DEPLOY_DIR }}
+        run: |
+          if [ ! -f k8s/01-config-secrets.yaml ]; then
+            echo "::error::k8s/01-config-secrets.yaml bulunamadı."
+            echo "Bu dosya .gitignore'da; makinede bir kez oluşturulup kubectl apply edilmeli."
+            exit 1
+          fi
+
+      - name: Deploy with Skaffold
+        working-directory: ${{ env.DEPLOY_DIR }}
+        run: skaffold run -n "$K8S_NAMESPACE" --cache-artifacts=false
+
+      - name: Wait for rollouts
+        run: |
+          kubectl rollout status deployment/cat-validator -n "$K8S_NAMESPACE" --timeout=300s
+          kubectl rollout status deployment/go-backend -n "$K8S_NAMESPACE" --timeout=300s
+
+      - name: Smoke test — cat-validator
+        run: |
+          kubectl run smoke-cat-validator \
+            --rm -i --restart=Never \
+            -n "$K8S_NAMESPACE" \
+            --image=curlimages/curl:8.5.0 \
+            -- curl -fsS http://kedi-filter-service:8000/health
+
+      - name: Smoke test — backend
+        run: |
+          kubectl run smoke-backend \
+            --rm -i --restart=Never \
+            -n "$K8S_NAMESPACE" \
+            --image=curlimages/curl:8.5.0 \
+            -- curl -fsS http://go-backend-service:8080/

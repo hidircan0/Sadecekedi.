@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  go:
+    name: Go — vet, test, build
+    runs-on: self-hosted
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test ./... -race -count=1
+
+      - name: Build
+        run: go build -o /tmp/sadecekedi-backend ./cmd/web
+
+  python:
+    name: Python — lint & test
+    runs-on: self-hosted
+    defaults:
+      run:
+        working-directory: cat-validator-service
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: cat-validator-service/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt pytest httpx
+
+      - name: Syntax check
+        run: python -m compileall .
+
+      - name: Test
+        run: pytest -v
+
+  docker-build:
+    name: Docker — k8s image build
+    runs-on: self-hosted
+    needs: [go, python]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build images
+        run: |
+          docker build -t docker.io/library/sadecekedi-backend:latest .
+          docker build -t docker.io/library/sadecekedi-yolo:latest ./cat-validator-service
