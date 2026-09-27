@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sadecekedi-endpoints
+data:
+  CAT_VALIDATOR_URL: "http://kedi-filter-service:8000"
+  MINIO_ENDPOINT: "minio-service:9000"
+  MINIO_BUCKET: "cats"
+  MINIO_SECURE: "false"

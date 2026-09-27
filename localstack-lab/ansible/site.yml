@@ -1,0 +1,53 @@
+---
+# Terraform writes the contract; Ansible checks it and can reach the hosts.
+- name: Control node — contract and LocalStack
+  hosts: control
+  gather_facts: false
+  vars:
+    terraform_dir: "{{ playbook_dir }}/terraform"
+  tasks:
+    - name: Terraform-generated backend env exists
+      ansible.builtin.stat:
+        path: "{{ terraform_dir }}/generated/backend.env"
+      register: backend_env
+
+    - name: Require terraform apply first
+      ansible.builtin.assert:
+        that: backend_env.stat.exists
+        fail_msg: "ansible/terraform/generated/backend.env yok. localstack-lab içinde: make apply"
+
+    - name: Load service contract
+      ansible.builtin.slurp:
+        src: "{{ terraform_dir }}/generated/backend.env"
+      register: contract
+
+    - name: Show contract
+      ansible.builtin.debug:
+        msg: "{{ (contract.content | b64decode).splitlines() }}"
+
+    - name: Probe LocalStack health
+      ansible.builtin.uri:
+        url: http://localhost:4566/_localstack/health
+        method: GET
+        status_code: [200]
+      register: localstack
+      failed_when: false
+
+    - name: Report LocalStack
+      ansible.builtin.debug:
+        msg: "{{ localstack.status | default('down') }} — compose up değilse normal"
+
+- name: Validator host — only when SSH target is set
+  hosts: validator
+  gather_facts: false
+  vars:
+    terraform_dir: "{{ playbook_dir }}/terraform"
+  tasks:
+    - name: Skip until a real GPU/VPS is passed
+      ansible.builtin.debug:
+        msg: "Uzak kutu için: make ansible-validator validator_ssh_host=IP"
+      when: validator_ssh_connection | default('local') == 'local'
+
+    - name: Ping validator over SSH
+      ansible.builtin.ping:
+      when: validator_ssh_connection | default('local') == 'ssh'

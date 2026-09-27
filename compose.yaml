@@ -1,0 +1,56 @@
+# k3s yokken aynı dört servis. .env kökten okunur.
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: sadecekedi
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d sadecekedi"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: adobe/s3mock:latest
+    environment:
+      initialBuckets: cats
+    ports:
+      - "9000:9090"
+
+  validator:
+    build:
+      context: ./cat-validator-service
+      dockerfile: Dockerfile.cpu
+    ports:
+      - "8000:8000"
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@postgres:5432/sadecekedi?sslmode=disable
+      MINIO_ENDPOINT: minio:9000
+      MINIO_BUCKET: cats
+      MINIO_SECURE: "false"
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      CAT_VALIDATOR_URL: http://validator:8000
+      ADMIN_USER: ${ADMIN_USER}
+      ADMIN_PASS: ${ADMIN_PASS}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      validator:
+        condition: service_started
+
+volumes:
+  pgdata:

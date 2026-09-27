@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sadecekedi-endpoints
+data:
+  CAT_VALIDATOR_URL: "${validator_url}"
+  MINIO_ENDPOINT: "${storage_endpoint}"
+  MINIO_BUCKET: "${storage_bucket}"
+  MINIO_SECURE: "${storage_secure}"

@@ -26,6 +26,7 @@ func main() {
 	validatorURL := getenvOrDefault("CAT_VALIDATOR_URL", "http://host.docker.internal:8000")
 	minioEndpoint := getenvOrDefault("MINIO_ENDPOINT", "localhost:9000")
 	minioBucket := getenvOrDefault("MINIO_BUCKET", "cats")
+	minioSecure := getenvOrDefault("MINIO_SECURE", "false") == "true"
 
 	dsn := getenvOrDefault("DATABASE_URL", "")
 	minioAccessKey := getenvOrDefault("MINIO_ACCESS_KEY", "")
@@ -58,8 +59,10 @@ func main() {
 
 	// 2. MINIO İSTEMCİSİ
 	minioClient, err := minio.New(minioEndpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(minioAccessKey, minioSecretKey, ""),
-		Secure: false,
+		Creds:        credentials.NewStaticV4(minioAccessKey, minioSecretKey, ""),
+		Secure:       minioSecure,
+		Region:       "us-east-1",
+		BucketLookup: minio.BucketLookupPath, // s3mock / LocalStack: path-style, not cats.host
 	})
 	if err != nil {
 		log.Fatalf("failed to create minio client: %v", err)
@@ -150,7 +153,8 @@ func ensureBucketReady(ctx context.Context, client *minio.Client, bucket string)
     }`, bucket)
 
 	if err := client.SetBucketPolicy(ctx, bucket, policy); err != nil {
-		return fmt.Errorf("set bucket public policy: %w", err)
+		// S3Mock and some local S3 stand-ins have no policy API.
+		log.Printf("bucket policy skipped: %v", err)
 	}
 
 	return nil

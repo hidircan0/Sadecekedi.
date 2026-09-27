@@ -25,11 +25,8 @@ spec:
           envFrom:
             - secretRef:
                 name: sadecekedi-secrets
-          env:
-            - name: MINIO_ENDPOINT
-              value: "minio-service:9000"
-            - name: CAT_VALIDATOR_URL
-              value: "http://kedi-filter-service:8000"
+            - configMapRef:
+                name: sadecekedi-endpoints
           resources:
             requests:
               cpu: 100m

@@ -1,0 +1,137 @@
+---
+# Skaffold olmadan basar. k3s import Ansible'da değil: sudo TTY ister.
+# Makefile: --tags build → sudo import → --tags apply
+# deploy_mode: cpu | gpu | split
+- name: Deploy Sadecekedi
+  hosts: control
+  gather_facts: false
+  vars:
+    repo_root: "{{ playbook_dir }}/../.."
+    terraform_dir: "{{ playbook_dir }}/terraform"
+    deploy_mode: "{{ deploy_mode | default('cpu') }}"
+    k8s_ns: sadecekedi
+  tasks:
+    - name: Require cluster secrets
+      ansible.builtin.stat:
+        path: "{{ repo_root }}/k8s/01-config-secrets.yaml"
+      register: secrets
+      tags: [always]
+
+    - name: Fail if secrets file is missing
+      ansible.builtin.assert:
+        that: secrets.stat.exists
+        fail_msg: "k8s/01-config-secrets.yaml yok. Skaffold yolu da bunu ister."
+      tags: [always]
+
+    - name: Require generated endpoints for split
+      ansible.builtin.stat:
+        path: "{{ terraform_dir }}/generated/k8s-endpoints.yaml"
+      register: generated_cm
+      when: deploy_mode == "split"
+      tags: [always]
+
+    - name: Fail if terraform contract is missing
+      ansible.builtin.assert:
+        that: generated_cm.stat.exists
+        fail_msg: "split için önce: make apply"
+      when: deploy_mode == "split"
+      tags: [always]
+
+    - name: Manifest list (CPU)
+      ansible.builtin.set_fact:
+        k8s_files:
+          - k8s/00-namespace.yaml
+          - k8s/01-config-secrets.yaml
+          - k8s/02-postgres.yaml
+          - k8s/03-minio.yaml
+          - k8s/04-yolo-fastapi.cpu.yaml
+          - k8s/05-backend-go.yaml
+          - k8s/06-ingress.yaml
+          - k8s/07-monitoring.yaml
+          - k8s/08-cloudflared.yaml
+          - k8s/10-hpa.yaml
+          - k8s/11-endpoints.yaml
+      when: deploy_mode == "cpu"
+      tags: [always]
+
+    - name: Manifest list (GPU)
+      ansible.builtin.set_fact:
+        k8s_files:
+          - k8s/00-namespace.yaml
+          - k8s/01-config-secrets.yaml
+          - k8s/02-postgres.yaml
+          - k8s/03-minio.yaml
+          - k8s/04-yolo-fastapi.yaml
+          - k8s/05-backend-go.yaml
+          - k8s/06-ingress.yaml
+          - k8s/07-monitoring.yaml
+          - k8s/08-cloudflared.yaml
+          - k8s/10-hpa.yaml
+          - k8s/11-endpoints.yaml
+      when: deploy_mode == "gpu"
+      tags: [always]
+
+    - name: Manifest list (split)
+      ansible.builtin.set_fact:
+        k8s_files:
+          - k8s/00-namespace.yaml
+          - k8s/01-config-secrets.yaml
+          - k8s/02-postgres.yaml
+          - k8s/03-minio.yaml
+          - k8s/05-backend-go.yaml
+          - k8s/06-ingress.yaml
+          - k8s/07-monitoring.yaml
+          - k8s/08-cloudflared.yaml
+          - k8s/10-hpa.backend-only.yaml
+      when: deploy_mode == "split"
+      tags: [always]
+
+    - name: Reject unknown deploy_mode
+      ansible.builtin.assert:
+        that: k8s_files is defined
+        fail_msg: "deploy_mode cpu, gpu veya split olmalı"
+      tags: [always]
+
+    - name: Build backend image
+      ansible.builtin.command:
+        cmd: docker build -t docker.io/library/sadecekedi-backend:latest -f Dockerfile .
+        chdir: "{{ repo_root }}"
+      environment:
+        DOCKER_BUILDKIT: "1"
+      changed_when: true
+      tags: [build]
+
+    - name: Build validator image (CPU)
+      ansible.builtin.command:
+        cmd: docker build -t docker.io/library/sadecekedi-yolo:latest -f Dockerfile.cpu .
+        chdir: "{{ repo_root }}/cat-validator-service"
+      environment:
+        DOCKER_BUILDKIT: "1"
+      changed_when: true
+      when: deploy_mode == "cpu"
+      tags: [build]
+
+    - name: Build validator image (GPU)
+      ansible.builtin.command:
+        cmd: docker build -t docker.io/library/sadecekedi-yolo:latest -f Dockerfile .
+        chdir: "{{ repo_root }}/cat-validator-service"
+      environment:
+        DOCKER_BUILDKIT: "1"
+      changed_when: true
+      when: deploy_mode == "gpu"
+      tags: [build]
+
+    - name: Apply manifests
+      ansible.builtin.command:
+        cmd: "kubectl apply -n {{ k8s_ns }} -f {{ repo_root }}/{{ item }}"
+        chdir: "{{ repo_root }}"
+      loop: "{{ k8s_files }}"
+      changed_when: true
+      tags: [apply]
+
+    - name: Apply Terraform-generated endpoints (split)
+      ansible.builtin.command:
+        cmd: "kubectl apply -n {{ k8s_ns }} -f {{ terraform_dir }}/generated/k8s-endpoints.yaml"
+      when: deploy_mode == "split"
+      changed_when: true
+      tags: [apply]

@@ -16,25 +16,5 @@ venv/
 minio_data/
 pgdata/
 
-_diag/
-_work/
-.credentials
-.credentials_rsparams
-.path
-.runner
-.service
-actions-runner-linux-x64-2.335.1.tar.gz
-config.sh
-run-helper.cmd.template
-run-helper.sh.template
-run-helper.sh
-run-helper.cmd
-env.sh
-runsvc.sh
-safe_sleep.sh
-svc.sh
-externals/
-*.log
-
 k8s/01-config-secrets.yaml
 k8s/*secret*.yaml

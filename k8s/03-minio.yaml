@@ -1,3 +1,4 @@
+# Docker Hub minio/minio bu ağda 401. S3-uyumlu adobe/s3mock (yerelde çekildi).
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -15,29 +16,16 @@ spec:
     spec:
       containers:
         - name: minio
-          image: minio/minio:latest
-          args:
-            - server
-            - /data
-            - --console-address
-            - ":9001"
+          image: adobe/s3mock:latest
+          imagePullPolicy: IfNotPresent
           ports:
-            - containerPort: 9000
-            - containerPort: 9001
+            - containerPort: 9090
           env:
-            - name: MINIO_ROOT_USER
-              valueFrom:
-                secretKeyRef:
-                  name: sadecekedi-secrets
-                  key: MINIO_ROOT_USER
-            - name: MINIO_ROOT_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: sadecekedi-secrets
-                  key: MINIO_ROOT_PASSWORD
+            - name: initialBuckets
+              value: cats
           volumeMounts:
             - name: minio-data
-              mountPath: /data
+              mountPath: /tmp
   volumeClaimTemplates:
     - metadata:
         name: minio-data
@@ -55,9 +43,6 @@ spec:
   ports:
     - name: api
       port: 9000
-      targetPort: 9000
-    - name: console
-      port: 9001
-      targetPort: 9001
+      targetPort: 9090
   selector:
     app: minio

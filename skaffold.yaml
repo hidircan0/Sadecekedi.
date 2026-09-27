@@ -44,6 +44,7 @@ manifests:
     - k8s/07-monitoring.yaml
     - k8s/08-cloudflared.yaml
     - k8s/10-hpa.yaml
+    - k8s/11-endpoints.yaml
     # 09-nvidia-device-plugin.yaml + nvidia-time-slicing.yaml kube-system'de kalır:
     #   kubectl apply -f k8s/nvidia-time-slicing.yaml
     #   kubectl apply -f k8s/09-nvidia-device-plugin.yaml
@@ -78,3 +79,24 @@ profiles:
       - op: replace
         path: /manifests/rawYaml/4
         value: k8s/04-yolo-fastapi.cpu.yaml
+  # Validator (and optionally storage) run elsewhere. Set URLs in
+  # localstack-lab/ansible/terraform/terraform.tfvars, then: cd localstack-lab && make apply
+  - name: split
+    patches:
+      - op: remove
+        path: /build/artifacts/1
+      - op: replace
+        path: /manifests/rawYaml
+        value:
+          - k8s/00-namespace.yaml
+          - k8s/01-config-secrets.yaml
+          - k8s/02-postgres.yaml
+          - k8s/03-minio.yaml
+          - k8s/05-backend-go.yaml
+          - k8s/06-ingress.yaml
+          - k8s/07-monitoring.yaml
+          - k8s/08-cloudflared.yaml
+          - k8s/10-hpa.backend-only.yaml
+          - localstack-lab/ansible/terraform/generated/k8s-endpoints.yaml
+      - op: remove
+        path: /portForward/1
