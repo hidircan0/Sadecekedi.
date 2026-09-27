@@ -1,6 +1,8 @@
 # Şifreler
 .env
 *.env
+!.env.example
+!localstack-lab/.env.example
 
 # Go
 /bin/
