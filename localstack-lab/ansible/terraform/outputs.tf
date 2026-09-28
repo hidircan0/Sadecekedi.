@@ -53,3 +53,31 @@ output "storage_endpoint" {
 output "storage_bucket" {
   value = var.storage_bucket
 }
+
+output "vpc_id" {
+  value = aws_vpc.lab_vpc.id
+}
+
+output "subnet_id" {
+  value = aws_subnet.lab_subnet.id
+}
+
+output "security_group_id" {
+  value = aws_security_group.lab_sg.id
+}
+
+output "ec2_instance_id" {
+  value = aws_instance.web_server.id
+}
+
+output "ec2_public_ip" {
+  value = aws_instance.web_server.public_ip
+}
+
+output "ec2_private_ip" {
+  value = aws_instance.web_server.private_ip
+}
+
+output "s3_object_key" {
+  value = aws_s3_object.sample_file.key
+}

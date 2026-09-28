@@ -43,3 +43,9 @@ variable "storage_secure" {
   description = "HTTPS when talking to object storage."
   default     = false
 }
+
+variable "ssh_public_key" {
+  type        = string
+  description = "OpenSSH public key for EC2 key pair."
+  default     = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCs7D2J0rwtJz8ZOjnwyDwp/NVx26Zn4v7SW5BkYznB6pkYrbTnJRo4BsYSuB7yrbZs+N4R7wCOgjbDNUrIjGCEsgZaYzT9EaVG4tU3y1/SG1OoBMlQ3w793XW+eIg/z0oQCiLNvLjd1fy9+dSzvluA5VE83hy+ECNmMbZ06/YSvxNOj/A8p48WRsg/3qwus2c7VddcSHLgrlO0oXDINsf67i1Lhb6661FpRDW/f5X9mKXiDnQVumDS1fah1hSP6C/s+ksz0GvtT2Vg/m8Y9+djMPUv7yHoEj9coFlPxOr56U3N39LaAw+9Gn6T9KA8A+ZW0s6po5Yr4mq+Zmq5+GB/ hidircan@localstack"
+}
