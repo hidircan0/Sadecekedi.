@@ -1,0 +1,52 @@
+# Traefik + Prometheus + KEDA Trafik Bazlı Otomatik Ölçekleme (Autoscaling)
+# Bu manifest, hem CPU/RAM hem de Traefik saniyelik HTTP isteklerini (RPS) izleyerek
+# go-backend pod sayısını anlık olarak 1'den 10'a kadar ölçeklendirir.
+
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: go-backend-traffic-scaler
+  namespace: sadecekedi
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: go-backend
+  minReplicaCount: 1
+  maxReplicaCount: 10
+  cooldownPeriod: 60
+  pollingInterval: 15
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+            - type: Percent
+              value: 100
+              periodSeconds: 15
+        scaleDown:
+          stabilizationWindowSeconds: 120
+          policies:
+            - type: Percent
+              value: 50
+              periodSeconds: 60
+  triggers:
+    # 1. Traefik HTTP İstek Sayısı (Trafik Tetikleyicisi)
+    - type: prometheus
+      metadata:
+        serverAddress: http://prometheus-service.sadecekedi.svc.cluster.local:9090
+        metricName: traefik_service_requests_total
+        threshold: '30' # Pod başına saniyede 30 istek eşiği
+        query: |
+          sum(rate(traefik_service_requests_total{service=~".*go-backend-service.*"}[1m]))
+    # 2. CPU Kullanım Eşiği (%70)
+    - type: cpu
+      metadata:
+        type: Utilization
+        value: "70"
+    # 3. Bellek Kullanım Eşiği (%80)
+    - type: memory
+      metadata:
+        type: Utilization
+        value: "80"

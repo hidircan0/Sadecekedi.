@@ -1,3 +1,12 @@
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: request-size-limit
+  namespace: sadecekedi
+spec:
+  buffering:
+    maxRequestBodyBytes: 52428800 # 50MB
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -5,7 +14,7 @@ metadata:
   namespace: sadecekedi
   annotations:
     traefik.ingress.kubernetes.io/router.entrypoints: web
-    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    traefik.ingress.kubernetes.io/router.middlewares: sadecekedi-request-size-limit@kubernetescrd
 spec:
   rules:
     - host: api.sadecekedi.local
@@ -27,4 +36,4 @@ spec:
               service:
                 name: minio-service
                 port:
-                  number: 9001
+                  number: 9000

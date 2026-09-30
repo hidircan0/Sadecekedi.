@@ -1,4 +1,5 @@
 # HPA — metrics-server k3s'te gömülü. GPU time-slice tavanı 4 (nvidia-time-slicing.yaml).
+# go-backend autoscaling is managed by k8s/12-keda-autoscaling.yaml (KEDA ScaledObject).
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -36,31 +37,3 @@ spec:
         - type: Pods
           value: 1
           periodSeconds: 60
----
-apiVersion: autoscaling/v2
-kind: HorizontalPodAutoscaler
-metadata:
-  name: go-backend
-spec:
-  scaleTargetRef:
-    apiVersion: apps/v1
-    kind: Deployment
-    name: go-backend
-  minReplicas: 1
-  maxReplicas: 4
-  metrics:
-    - type: Resource
-      resource:
-        name: cpu
-        target:
-          type: Utilization
-          averageUtilization: 70
-  behavior:
-    scaleUp:
-      stabilizationWindowSeconds: 15
-      policies:
-        - type: Pods
-          value: 2
-          periodSeconds: 15
-    scaleDown:
-      stabilizationWindowSeconds: 120

@@ -51,6 +51,8 @@
           - k8s/08-cloudflared.yaml
           - k8s/10-hpa.yaml
           - k8s/11-endpoints.yaml
+          - k8s/12-keda-autoscaling.yaml
+          - k8s/13-traefik-dashboard.yaml
       when: deploy_mode == "cpu"
       tags: [always]
 
@@ -68,6 +70,8 @@
           - k8s/08-cloudflared.yaml
           - k8s/10-hpa.yaml
           - k8s/11-endpoints.yaml
+          - k8s/12-keda-autoscaling.yaml
+          - k8s/13-traefik-dashboard.yaml
       when: deploy_mode == "gpu"
       tags: [always]
 
@@ -83,6 +87,8 @@
           - k8s/07-monitoring.yaml
           - k8s/08-cloudflared.yaml
           - k8s/10-hpa.backend-only.yaml
+          - k8s/12-keda-autoscaling.yaml
+          - k8s/13-traefik-dashboard.yaml
       when: deploy_mode == "split"
       tags: [always]
 
