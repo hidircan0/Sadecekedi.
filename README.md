@@ -1,81 +1,165 @@
-# Sadece Kedi (Only Cat) - AI-Powered Validation Platform 🐈🛡️
+# Sadecekedi
 
-A high-performance, secure, and AI-driven web platform designed exclusively for uploading and validating cat photographs. Built with a strict **Zero-Trust** DevSecOps architecture, it features a lightweight Go backend that delegates heavy image processing to an isolated Python AI microservice.
+Sadecekedi is a cat image upload and validation platform. A Go web application handles requests and persistence, while an isolated FastAPI service validates uploaded images with object detection, content filtering, and OCR.
 
-##  Architecture & Tech Stack
+The project also includes a local infrastructure lab built with LocalStack, Terraform, Ansible, and k3s.
 
-This project is divided into an API/Traffic gateway and an isolated AI Validation Engine, running on Kubernetes and protected by Cloudflare Tunnels.
+## Architecture
 
-* **Frontend:** HTMX & pure HTML/CSS (Zero JS bloat).
-* **Core Backend / Traffic Controller:** Go (`net/http`). Handles heavy concurrent traffic efficiently with minimal RAM footprint (Goroutines).
-* **AI Validation Microservice:** Python (FastAPI).
-* **Machine Learning & OCR Models:**
-  * **YOLO11n:** Object detection (Strictly validates the presence of a 'cat').
-  * **NudeNet:** NSFW/Inappropriate content filtering.
-  * **Tesseract OCR:** Text extraction to block banned words and phone numbers.
-* **Infrastructure & Security:** Kubernetes, Skaffold, Cloudflare Tunnels (IP masking & Reverse Proxy).
-* **Observability:** Prometheus & Grafana for real-time memory, CPU, and traffic monitoring.
+- **Web application:** Go, `net/http`, HTML templates, and HTMX
+- **Image validation:** Python, FastAPI, YOLO, NudeNet, and Tesseract OCR
+- **Database:** PostgreSQL
+- **Object storage:** S3-compatible storage
+- **Container orchestration:** k3s and Kubernetes manifests
+- **Ingress:** Traefik
+- **External access:** Cloudflare Tunnel
+- **Observability:** Prometheus, Grafana, and Node Exporter
+- **Autoscaling:** Kubernetes HPA and KEDA
+- **Infrastructure lab:** LocalStack, Terraform, and Ansible
+- **CI/CD:** GitHub Actions and GitHub Container Registry
 
-##  Security Features (Defense in Depth)
+## Request Flow
 
-1. **Network Layer:** True IP is hidden behind Cloudflare Tunnels. Azure NSG drops all external port scans (Filtered).
-2. **Application Layer (Magic Bytes Validation):** Built-in defense against `Application Layer DoS` attacks. File extensions are ignored; uploaded files are validated via deep byte inspection (`PIL.UnidentifiedImageError`) to block disguised malicious payloads (e.g., `.txt` disguised as `.jpg`).
-3. **Content Layer:** Multi-stage AI pipeline ensures no NSFW content, hidden advertisements, or irrelevant images pass the gateway.
+```text
+Client
+  |
+  v
+Cloudflare Tunnel / Traefik
+  |
+  v
+Go backend
+  |-- PostgreSQL
+  |-- S3-compatible object storage
+  `-- FastAPI validator
+        |-- YOLO
+        |-- NudeNet
+        `-- Tesseract OCR
+```
 
-## 📂 Project Structure
+## Project Structure
+
 ```text
 .
-├── .github/                  # CI/CD Pipelines (GitHub Actions)
-├── cat-validator-service/    # Python/FastAPI Microservice (YOLO, NudeNet, OCR)
-├── cmd/web/                  # Go application entrypoint & dependency wiring
-├── internal/
-│   ├── app/                  # Use-case & Service layer
-│   ├── domain/               # Domain entities
-│   ├── http/                 # Go Handlers & Router
-│   └── storage/local/        # Local filesystem repository
-├── web/
-│   ├── static/               # CSS and static assets
-│   └── templates/            # HTML templates and HTMX partials
-├── k8s/                      # Kubernetes manifests
-├── skaffold.yaml             # Build & deploy orchestration
-├── Dockerfile                # Go backend containerization
-└── go.mod & go.sum           # Go dependencies
+├── .github/workflows/        GitHub Actions workflows
+├── cat-validator-service/    FastAPI image validation service
+├── cmd/web/                  Go application entry point
+├── internal/                 Domain, application, HTTP, and storage packages
+├── k8s/                      Kubernetes manifests
+├── localstack-lab/
+│   ├── ansible/              Build and deployment orchestration
+│   └── ansible/terraform/    LocalStack infrastructure definitions
+├── scripts/                  Secret rendering and k3s image import scripts
+├── web/                      HTML templates and static assets
+├── Dockerfile                Go backend image
+└── skaffold.yaml             Local Kubernetes development configuration
 ```
 
-##  How to Run
+## Requirements
 
-**1. Clone the repository:**
+- Linux
+- Docker
+- k3s
+- Terraform
+- Python 3
+- AWS CLI
+- `curl`
+- `sudo` access for k3s operations
+
+KEDA must be installed once because the deployment includes a `ScaledObject`:
+
 ```bash
-git clone https://github.com/hidircanaslan/sadecekedi.git
-cd sadecekedi
+helm repo add kedacore https://kedacore.github.io/charts
+helm repo update
+helm install keda kedacore/keda --namespace keda --create-namespace
 ```
 
-**2. Secrets dosyasını hazırla (bir kez):**
+## Configuration
+
+Create the application environment file:
+
 ```bash
-# k8s/01-config-secrets.yaml oluştur, değerleri doldur
+cp .env.example .env
 ```
 
-**3. Stack:**
+Fill every required value in `.env`, then generate the Kubernetes Secret manifest:
 
-Günlük UI / Go işi (hafif CPU validator, `main.py` hot-reload):
+```bash
+./scripts/render-k8s-secrets.sh
+```
+
+Create the LocalStack environment file:
+
+```bash
+cp localstack-lab/.env.example localstack-lab/.env
+```
+
+Replace `SSH_PUBLIC_KEY` with your own OpenSSH public key when needed. Do not commit either `.env` file or the generated Kubernetes Secret.
+
+## Start the Complete Local Environment
+
+```bash
+cd localstack-lab
+make up
+```
+
+This command:
+
+1. starts LocalStack;
+2. provisions the simulated AWS resources with Terraform;
+3. builds the backend and validator images with Ansible;
+4. imports the images into k3s;
+5. applies the Kubernetes manifests;
+6. starts local port forwarding.
+
+Local endpoints:
+
+- Application: `http://localhost:8080`
+- Grafana: `http://localhost:3000`
+- Traefik dashboard: `http://localhost:9080/dashboard/`
+- LocalStack API: `http://localhost:4566`
+
+Stop and remove the local application environment:
+
+```bash
+cd localstack-lab
+make down
+```
+
+## Development
+
+Run Go checks:
+
+```bash
+go vet ./...
+go test ./... -race -count=1
+```
+
+Run validator tests:
+
+```bash
+cd cat-validator-service
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt pytest httpx
+pytest -v
+```
+
+Run the CPU Kubernetes development profile:
+
 ```bash
 skaffold dev -n sadecekedi -p cpu
 ```
 
-GPU (CUDA YOLO) — ilk build uzun, sonrakiler cache + skip import:
-```bash
-skaffold dev -n sadecekedi
-```
+## CI/CD
 
-`--cache-artifacts=false` kullanma; YOLO katmanlarını her seferinde yeniden kurar.
+The CI workflow validates the Go and Python code and verifies both container builds on GitHub-hosted runners.
 
-Port forward: 8080 (backend), 8000 (validator), 9001 (minio), 3000 (grafana).
+After CI succeeds on `main`, the CD workflow publishes versioned backend and validator images to GitHub Container Registry. Remote deployment is provided as a disabled template until a target server and its SSH secrets are configured.
 
-**Local Development (Go Backend Only):**
-```bash
-go run ./cmd/web
-```
+## Security Notes
 
-##  Observability
-
-Memory management is strictly monitored. The Python microservice is designed to load heavy ML models into memory and release temporary tensors (breathing/garbage collection) efficiently to prevent memory leaks during high traffic spikes.
+- Secrets are generated from ignored environment files.
+- Uploaded files are validated by content rather than filename alone.
+- The validator runs as a separate service from the web application.
+- Cloudflare Tunnel can expose selected services without opening inbound host ports.
+- The Traefik dashboard should only be exposed on trusted development networks.

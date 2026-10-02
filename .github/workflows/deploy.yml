@@ -1,8 +1,8 @@
-name: CD — Deploy
+name: CD (Continuous Deployment)
 
 on:
   workflow_run:
-    workflows: [CI]
+    workflows: [CI (Continuous Integration)]
     types: [completed]
     branches: [main]
 
@@ -11,51 +11,88 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Deploy to Kubernetes (self-hosted)
+  # CD Step 1: Package & Release
+  # Derlenen uygulamaları Docker imajı haline getirip GitHub Container Registry (GHCR) üzerinde güvenli bir şekilde saklar.
+  # Bu işlem GitHub Actions sunucusunda (ubuntu-latest) çalışır ve harici bir sunucu gerektirmez.
+  release:
+    name: Package & Push to GHCR
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
-    runs-on: self-hosted
-    env:
-      DEPLOY_DIR: /home/hidircan/Sadecekedi.
-      K8S_NAMESPACE: sadecekedi
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
-      - name: Sync code to deploy directory
-        run: |
-          mkdir -p "$DEPLOY_DIR"
-          git --git-dir="$DEPLOY_DIR/.git" --work-tree="$DEPLOY_DIR" fetch origin main
-          git --git-dir="$DEPLOY_DIR/.git" --work-tree="$DEPLOY_DIR" checkout -f main
-          git --git-dir="$DEPLOY_DIR/.git" --work-tree="$DEPLOY_DIR" reset --hard "${{ github.event.workflow_run.head_sha }}"
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - name: Verify k8s secrets exist
-        working-directory: ${{ env.DEPLOY_DIR }}
-        run: |
-          if [ ! -f k8s/01-config-secrets.yaml ]; then
-            echo "::error::k8s/01-config-secrets.yaml bulunamadı."
-            echo "Bu dosya .gitignore'da; makinede bir kez oluşturulup kubectl apply edilmeli."
-            exit 1
-          fi
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Deploy with Skaffold
-        working-directory: ${{ env.DEPLOY_DIR }}
-        run: skaffold run -n "$K8S_NAMESPACE"
+      - name: Log in to GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Wait for rollouts
+      - name: Downcase Repository Owner Name (for Docker tags)
         run: |
-          kubectl rollout status deployment/cat-validator -n "$K8S_NAMESPACE" --timeout=300s
-          kubectl rollout status deployment/go-backend -n "$K8S_NAMESPACE" --timeout=300s
+          echo "OWNER_LC=${OWNER,,}" >> ${GITHUB_ENV}
+        env:
+          OWNER: '${{ github.repository_owner }}'
 
-      - name: Smoke test — cat-validator
-        run: |
-          kubectl run smoke-cat-validator \
-            --rm -i --restart=Never \
-            -n "$K8S_NAMESPACE" \
-            --image=curlimages/curl:8.5.0 \
-            -- curl -fsS http://kedi-filter-service:8000/health
+      - name: Build & Push Backend Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER_LC }}/sadecekedi-backend:latest
+            ghcr.io/${{ env.OWNER_LC }}/sadecekedi-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
-      - name: Smoke test — backend
+      - name: Build & Push YOLO Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./cat-validator-service
+          file: ./cat-validator-service/Dockerfile.cpu
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER_LC }}/sadecekedi-yolo:latest
+            ghcr.io/${{ env.OWNER_LC }}/sadecekedi-yolo:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # CD Step 2: Deployment
+  # Harici bir sunucu tetiklemek isterseniz bu job'ı aktifleştirebilirsiniz.
+  # Şu an tetiklenecek bir canlı sunucu olmadığı için bu adımlar örnek bir şablon sunar.
+  # Canlı sunucu aldığınızda GitHub Secrets üzerinden SSH_HOST, SSH_USER ve SSH_PRIVATE_KEY tanımlayarak
+  # bu job'ı doğrudan çalışır hale getirebilirsiniz.
+  deploy:
+    name: Trigger Remote Server Deployment
+    needs: [release]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Status Message
         run: |
-          kubectl run smoke-backend \
-            --rm -i --restart=Never \
-            -n "$K8S_NAMESPACE" \
-            --image=curlimages/curl:8.5.0 \
-            -- curl -fsS http://go-backend-service:8080/
+          echo "Geliştirme Ortamı CD Pipeline Tetiklendi!"
+          echo "GitHub Actions üzerinde Docker paketleme başarıyla tamamlandı."
+          echo "Tetiklenecek canlı bir VPS/Sunucu tanımlanmadığı için SSH adımına geçilmedi."
+
+      # canlandırmak isterseniz aşağıdaki adımları kullanabilirsiniz:
+      # - name: Deploy to VPS via SSH
+      #   uses: appleboy/ssh-action@v1.0.3
+      #   with:
+      #     host: ${{ secrets.SSH_HOST }}
+      #     username: ${{ secrets.SSH_USER }}
+      #     key: ${{ secrets.SSH_PRIVATE_KEY }}
+      #     port: 22
+      #     script: |
+      #       cd /home/${{ secrets.SSH_USER }}/Sadecekedi/localstack-lab
+      #       git fetch origin main
+      #       git reset --hard origin/main
+      #       # localstack-lab içindeki dağıtım komutunu tetikle
+      #       # Not: .env dosyasının sunucuda kurulu olduğunu varsayar
+      #       make up
