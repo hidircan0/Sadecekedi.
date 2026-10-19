@@ -91,3 +91,13 @@ jobs:
           tags: sadecekedi-yolo:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Build Upload Worker Image (Dry-run)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.worker
+          push: false
+          tags: sadecekedi-worker:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

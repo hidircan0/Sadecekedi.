@@ -32,12 +32,17 @@ build:
         manual:
           - src: "*.py"
             dest: /app
+    - image: docker.io/library/sadecekedi-worker
+      context: .
+      docker:
+        dockerfile: Dockerfile.worker
 manifests:
   rawYaml:
     - k8s/00-namespace.yaml
     - k8s/01-config-secrets.yaml
     - k8s/02-postgres.yaml
     - k8s/03-minio.yaml
+    - k8s/04-kafka.yaml
     - k8s/04-yolo-fastapi.yaml
     - k8s/05-backend-go.yaml
     - k8s/06-ingress.yaml
@@ -77,7 +82,7 @@ profiles:
         path: /build/artifacts/1/docker/dockerfile
         value: Dockerfile.cpu
       - op: replace
-        path: /manifests/rawYaml/4
+        path: /manifests/rawYaml/5
         value: k8s/04-yolo-fastapi.cpu.yaml
   # Validator (and optionally storage) run elsewhere. Set URLs in
   # localstack-lab/ansible/terraform/terraform.tfvars, then: cd localstack-lab && make apply
@@ -92,6 +97,7 @@ profiles:
           - k8s/01-config-secrets.yaml
           - k8s/02-postgres.yaml
           - k8s/03-minio.yaml
+          - k8s/04-kafka.yaml
           - k8s/05-backend-go.yaml
           - k8s/06-ingress.yaml
           - k8s/07-monitoring.yaml

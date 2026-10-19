@@ -65,6 +65,18 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Build & Push Upload Worker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.worker
+          push: true
+          tags: |
+            ghcr.io/${{ env.OWNER_LC }}/sadecekedi-worker:latest
+            ghcr.io/${{ env.OWNER_LC }}/sadecekedi-worker:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
   # CD Step 2: Deployment
   # Harici bir sunucu tetiklemek isterseniz bu job'ı aktifleştirebilirsiniz.
   # Şu an tetiklenecek bir canlı sunucu olmadığı için bu adımlar örnek bir şablon sunar.

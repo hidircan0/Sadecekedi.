@@ -14,6 +14,7 @@ import (
 	"strings"
 
 	"cat-uploader-go/internal/domain"
+	"github.com/google/uuid"
 	"github.com/nfnt/resize"
 	_ "golang.org/x/image/webp"
 )
@@ -27,6 +28,13 @@ var (
 
 // 1. KABLO BAĞLANTISI: Veritabanından neleri isteyebileceğimizi güncelledik
 type PhotoRepository interface {
+	EnqueueUpload(ctx context.Context, source io.Reader, originalName string, jobID string) (domain.UploadJob, error)
+	GetUploadJob(ctx context.Context, jobID string) (domain.UploadJob, error)
+	GetStagedUpload(ctx context.Context, jobID string) ([]byte, string, error)
+	SetUploadJobResult(ctx context.Context, jobID string, photo *domain.Photo, jobErr error) error
+	MarkUploadJobProcessing(ctx context.Context, jobID string) error
+	DeleteStagedUpload(ctx context.Context, jobID string) error
+	SaveForJob(ctx context.Context, source io.Reader, originalName string, jobID string) (domain.Photo, error)
 	Save(ctx context.Context, source io.Reader, originalName string) (domain.Photo, error)
 	List(ctx context.Context) ([]domain.Photo, error)
 	GetByID(ctx context.Context, id uint) (domain.Photo, error)
@@ -58,6 +66,10 @@ func NewPhotoService(repo PhotoRepository, validator CatValidator) *PhotoService
 }
 
 func (s *PhotoService) Upload(ctx context.Context, source multipart.File, originalName string) (domain.Photo, error) {
+	return s.upload(ctx, source, originalName, "")
+}
+
+func (s *PhotoService) upload(ctx context.Context, source multipart.File, originalName, jobID string) (domain.Photo, error) {
 	if source == nil || strings.TrimSpace(originalName) == "" {
 		return domain.Photo{}, ErrEmptyFile
 	}
@@ -87,8 +99,56 @@ func (s *PhotoService) Upload(ctx context.Context, source multipart.File, origin
 		return domain.Photo{}, err
 	}
 
+	if jobID != "" { return s.repo.SaveForJob(ctx, bytes.NewReader(optimizedImage), optimizedName, jobID) }
 	return s.repo.Save(ctx, bytes.NewReader(optimizedImage), optimizedName)
 }
+
+func (s *PhotoService) QueueUpload(ctx context.Context, source multipart.File, originalName string) (domain.UploadJob, error) {
+	if source == nil || strings.TrimSpace(originalName) == "" {
+		return domain.UploadJob{}, ErrEmptyFile
+	}
+	if !isAllowedImageExtension(originalName) {
+		return domain.UploadJob{}, ErrInvalidFileType
+	}
+	if _, err := source.Seek(0, io.SeekStart); err != nil {
+		return domain.UploadJob{}, err
+	}
+	return s.repo.EnqueueUpload(ctx, source, filepath.Base(originalName), uuid.NewString())
+}
+
+func (s *PhotoService) UploadJob(ctx context.Context, id string) (domain.UploadJob, error) {
+	return s.repo.GetUploadJob(ctx, id)
+}
+
+// ProcessQueuedUpload validates and persists a staged upload. The repository
+// associates the photo with the job so Kafka redelivery is idempotent.
+func (s *PhotoService) ProcessQueuedUpload(ctx context.Context, id string) error {
+	job, err := s.repo.GetUploadJob(ctx, id)
+	if err != nil { return err }
+	if job.Status == "succeeded" || job.Status == "failed" { return nil }
+	if err := s.repo.MarkUploadJobProcessing(ctx, id); err != nil { return err }
+	content, name, err := s.repo.GetStagedUpload(ctx, id)
+	if err != nil {
+		if updateErr := s.repo.SetUploadJobResult(ctx, id, nil, err); updateErr != nil { return errors.Join(err, updateErr) }
+		return nil
+	}
+	file := &memoryMultipartFile{Reader: bytes.NewReader(content)}
+	photo, err := s.upload(ctx, file, name, id)
+	if err != nil {
+		if updateErr := s.repo.SetUploadJobResult(ctx, id, nil, err); updateErr != nil { return errors.Join(err, updateErr) }
+		_ = s.repo.DeleteStagedUpload(ctx, id)
+		return nil
+	}
+	if err := s.repo.SetUploadJobResult(ctx, id, &photo, nil); err != nil { return err }
+	_ = s.repo.DeleteStagedUpload(ctx, id)
+	return nil
+}
+
+type memoryMultipartFile struct {
+	*bytes.Reader
+}
+
+func (*memoryMultipartFile) Close() error { return nil }
 
 func (s *PhotoService) List(ctx context.Context) ([]domain.Photo, error) {
 	return s.repo.List(ctx)

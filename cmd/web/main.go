@@ -6,12 +6,14 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"cat-uploader-go/internal/app"
 	"cat-uploader-go/internal/domain"
 	"cat-uploader-go/internal/http/router"
 	"cat-uploader-go/internal/integration/catvalidator"
+	kafkaintegration "cat-uploader-go/internal/integration/kafka"
 	"cat-uploader-go/internal/storage/postgres"
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -53,7 +55,7 @@ func main() {
 	sqlDB.SetMaxIdleConns(50)            // Boşta bekleyen bağlantı havuzu
 	sqlDB.SetConnMaxLifetime(10 * time.Minute)
 
-	if err := db.AutoMigrate(&domain.Photo{}); err != nil {
+	if err := db.AutoMigrate(&domain.Photo{}, &domain.UploadJob{}, &domain.OutboxEvent{}); err != nil {
 		log.Fatalf("failed to migrate photos table: %v", err)
 	}
 
@@ -91,6 +93,7 @@ func main() {
 		validatorHTTPClient,
 	)
 	service := app.NewPhotoService(repo, validator)
+	go kafkaintegration.PublishOutbox(context.Background(), repo, splitCSV(getenvOrDefault("KAFKA_BROKERS", "localhost:9092")), getenvOrDefault("KAFKA_TOPIC", "photo-uploads"))
 	handler := router.NewHandlerSet(service)
 	r := router.New(handler)
 
@@ -126,6 +129,13 @@ func getenvOrDefault(key string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func splitCSV(value string) []string {
+	parts := strings.Split(value, ",")
+	brokers := make([]string, 0, len(parts))
+	for _, part := range parts { if part = strings.TrimSpace(part); part != "" { brokers = append(brokers, part) } }
+	return brokers
 }
 
 func ensureBucketReady(ctx context.Context, client *minio.Client, bucket string) error {

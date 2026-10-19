@@ -15,6 +15,7 @@ The project also includes a local infrastructure lab built with LocalStack, Terr
 - **External access:** Cloudflare Tunnel
 - **Observability:** Prometheus, Grafana, and Node Exporter
 - **Autoscaling:** Kubernetes HPA and KEDA
+- **Background jobs:** Apache Kafka in single-node KRaft mode, with a Go upload worker
 - **Infrastructure lab:** LocalStack, Terraform, and Ansible
 - **CI/CD:** GitHub Actions and GitHub Container Registry
 
@@ -29,12 +30,16 @@ Cloudflare Tunnel / Traefik
   v
 Go backend
   |-- PostgreSQL
-  |-- S3-compatible object storage
-  `-- FastAPI validator
-        |-- YOLO
-        |-- NudeNet
-        `-- Tesseract OCR
+  |-- S3-compatible object storage (staging)
+  `-- Kafka --> Go upload worker
+                 |-- PostgreSQL + S3-compatible object storage
+                 `-- FastAPI validator
+                       |-- YOLO
+                       |-- NudeNet
+                       `-- Tesseract OCR
 ```
+
+Photo uploads are staged in object storage, recorded with a PostgreSQL outbox event, and published to Kafka. A separate Go worker consumes each event, validates and optimizes the image, then stores the final photo. The upload form polls the job status until processing finishes.
 
 ## Project Structure
 
@@ -43,6 +48,7 @@ Go backend
 ├── .github/workflows/        GitHub Actions workflows
 ├── cat-validator-service/    FastAPI image validation service
 ├── cmd/web/                  Go application entry point
+├── cmd/upload-worker/        Kafka upload consumer
 ├── internal/                 Domain, application, HTTP, and storage packages
 ├── k8s/                      Kubernetes manifests
 ├── localstack-lab/
@@ -126,6 +132,14 @@ make down
 ```
 
 ## Development
+
+The root Compose stack starts Kafka, the backend, and the upload worker together. Kafka is available at `localhost:9092`; the application services use `kafka:9092` internally.
+
+```bash
+cp .env.example .env
+# Fill the required database, MinIO, and admin credentials in .env.
+docker compose up --build
+```
 
 Run Go checks:
 

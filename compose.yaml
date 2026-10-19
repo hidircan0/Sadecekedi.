@@ -1,5 +1,33 @@
-# k3s yokken aynı dört servis. .env kökten okunur.
+# .env kökten okunur; Kafka, web uygulaması ve upload worker birlikte başlar.
 services:
+  kafka:
+    image: apache/kafka:3.9.0
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:9092,EXTERNAL://:29092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL://localhost:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    ports:
+      - "9092:29092"
+    volumes:
+      - kafkadata:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
   postgres:
     image: postgres:15-alpine
     environment:
@@ -44,6 +72,8 @@ services:
       CAT_VALIDATOR_URL: http://validator:8000
       ADMIN_USER: ${ADMIN_USER}
       ADMIN_PASS: ${ADMIN_PASS}
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC: photo-uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -51,6 +81,33 @@ services:
         condition: service_started
       validator:
         condition: service_started
+      kafka:
+        condition: service_healthy
+
+  upload-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASS}@postgres:5432/sadecekedi?sslmode=disable
+      MINIO_ENDPOINT: minio:9000
+      MINIO_BUCKET: cats
+      MINIO_SECURE: "false"
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      CAT_VALIDATOR_URL: http://validator:8000
+      KAFKA_BROKERS: kafka:9092
+      KAFKA_TOPIC: photo-uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      validator:
+        condition: service_started
+      kafka:
+        condition: service_healthy
 
 volumes:
   pgdata:
+  kafkadata:

@@ -54,13 +54,20 @@ import_one() {
 
 IMAGES=(
   "docker.io/library/sadecekedi-backend:latest"
+  "docker.io/library/sadecekedi-worker:latest"
   "docker.io/library/sadecekedi-yolo:latest"
+  "apache/kafka:3.9.0"
   "adobe/s3mock:latest"
   "busybox:latest"
   "postgres:15-alpine"
+  "cloudflare/cloudflared:latest"
+  "prom/prometheus:latest"
+  "grafana/grafana:latest"
+  "prom/node-exporter:latest"
 )
 
 docker tag sadecekedi-backend:latest docker.io/library/sadecekedi-backend:latest 2>/dev/null || true
+docker tag sadecekedi-worker:latest docker.io/library/sadecekedi-worker:latest 2>/dev/null || true
 docker tag sadecekedi-yolo:latest docker.io/library/sadecekedi-yolo:latest 2>/dev/null || true
 
 for img in "${IMAGES[@]}"; do

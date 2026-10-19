@@ -31,10 +31,18 @@ type mockRepo struct {
 	saved bool
 }
 
+func (m *mockRepo) EnqueueUpload(_ context.Context, _ io.Reader, name, id string) (domain.UploadJob, error) { return domain.UploadJob{ID:id, Filename:name, Status:"queued"}, nil }
+func (m *mockRepo) GetUploadJob(_ context.Context, id string) (domain.UploadJob, error) { return domain.UploadJob{ID:id, Status:"queued"}, nil }
+func (m *mockRepo) GetStagedUpload(_ context.Context, _ string) ([]byte, string, error) { return nil, "", nil }
+func (m *mockRepo) SetUploadJobResult(_ context.Context, _ string, _ *domain.Photo, _ error) error { return nil }
+func (m *mockRepo) MarkUploadJobProcessing(_ context.Context, _ string) error { return nil }
+func (m *mockRepo) DeleteStagedUpload(_ context.Context, _ string) error { return nil }
+
 func (m *mockRepo) Save(_ context.Context, _ io.Reader, originalName string) (domain.Photo, error) {
 	m.saved = true
 	return domain.Photo{ID: 1, Filename: originalName}, nil
 }
+func (m *mockRepo) SaveForJob(ctx context.Context, source io.Reader, name, _ string) (domain.Photo, error) { return m.Save(ctx, source, name) }
 
 func (m *mockRepo) List(_ context.Context) ([]domain.Photo, error)         { return nil, nil }
 func (m *mockRepo) GetByID(_ context.Context, _ uint) (domain.Photo, error) { return domain.Photo{}, nil }

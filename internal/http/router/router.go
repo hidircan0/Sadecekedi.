@@ -23,6 +23,7 @@ func New(h *HandlerSet) http.Handler {
     mux := http.NewServeMux()
     mux.HandleFunc("GET /{$}", h.Home.Home)
     mux.HandleFunc("POST /upload", h.Home.Upload)
+    mux.HandleFunc("GET /upload/jobs/{id}", h.Home.UploadJob)
     mux.HandleFunc("GET /zula", h.Home.Zula)
     
     // RASTGELE VE HEDEFLİ KEDİ GETİRME (EKSİK OLAN YOLU AÇTIK)

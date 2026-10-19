@@ -7,3 +7,5 @@ data:
   MINIO_ENDPOINT: "minio-service:9000"
   MINIO_BUCKET: "cats"
   MINIO_SECURE: "false"
+  KAFKA_BROKERS: "kafka-service:9092"
+  KAFKA_TOPIC: "photo-uploads"

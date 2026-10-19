@@ -19,7 +19,8 @@ const maxUploadSize = 8 << 20
 
 // 1. SADECEKEDİ Servis Arayüzü
 type PhotoService interface {
-	Upload(ctx context.Context, source multipart.File, originalName string) (domain.Photo, error)
+	QueueUpload(ctx context.Context, source multipart.File, originalName string) (domain.UploadJob, error)
+	UploadJob(ctx context.Context, id string) (domain.UploadJob, error)
 	List(ctx context.Context) ([]domain.Photo, error)
 	GetRandom(ctx context.Context) (domain.Photo, error)
 	GetNext(ctx context.Context, id uint) (domain.Photo, error)
@@ -152,8 +153,9 @@ func (h *HomeHandler) Upload(w http.ResponseWriter, r *http.Request) {
     }
     defer file.Close()
 
-    // ORİJİNAL, yüksek kaliteli fotoğrafı Servis'e (YOLO'ya) yolluyoruz
-    if _, err := h.service.Upload(r.Context(), file, filepath.Base(fileHeader.Filename)); err != nil {
+    // Original upload is staged; the Kafka worker performs validation and optimization.
+    job, err := h.service.QueueUpload(r.Context(), file, filepath.Base(fileHeader.Filename))
+    if err != nil {
         if errors.Is(err, app.ErrInvalidFileType) || errors.Is(err, app.ErrEmptyFile) || errors.Is(err, app.ErrFileNameCollision) || errors.Is(err, app.ErrNotCat) {
             h.renderPartialFeedback(w, err.Error(), "", http.StatusOK)
             return
@@ -162,7 +164,23 @@ func (h *HomeHandler) Upload(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    h.renderPartialFeedback(w, "", "Yapay zeka onayladı, sıkıştırıldı ve arşive eklendi.", http.StatusOK)
+    setHTMLContentType(w)
+    w.WriteHeader(http.StatusAccepted)
+    w.Write([]byte(`<span hx-get="/upload/jobs/` + job.ID + `" hx-trigger="load, every 2s" hx-swap="outerHTML">[~] Yükleme kuyruğa alındı, doğrulama bekleniyor…</span>`))
+}
+
+func (h *HomeHandler) UploadJob(w http.ResponseWriter, r *http.Request) {
+	job, err := h.service.UploadJob(r.Context(), r.PathValue("id"))
+	if err != nil { http.Error(w, "upload job not found", http.StatusNotFound); return }
+	setHTMLContentType(w)
+	switch job.Status {
+	case "queued", "processing":
+		w.Write([]byte(`<span hx-get="/upload/jobs/` + job.ID + `" hx-trigger="every 2s" hx-swap="outerHTML">[~] Yükleme doğrulanıyor…</span>`))
+	case "succeeded":
+		w.Write([]byte(`<span class="text-success">[+] ONAY: Yapay zeka onayladı, sıkıştırıldı ve arşive eklendi.</span>`))
+	default:
+		w.Write([]byte(`<span class="text-error">[!] Yükleme işlenemedi.</span>`))
+	}
 }
 // Gümrük bildirimlerini HTMX'in istediği saf HTML'e çevirdik
 func (h *HomeHandler) renderPartialFeedback(w http.ResponseWriter, errorText string, successText string, status int) {
