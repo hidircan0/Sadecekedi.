@@ -1,6 +1,8 @@
 # Sadecekedi LocalStack & k3s Otomasyon Makefile
 # Bu dosya tüm sistemi tek komutla temiz bir şekilde açıp kapatmayı sağlar.
 
+-include .env
+
 ENDPOINT := http://127.0.0.1:4566
 TF_DIR := ansible/terraform
 TF := terraform -chdir=$(TF_DIR)
@@ -8,6 +10,11 @@ REPO := $(abspath $(CURDIR)/..)
 VENV := .venv
 ANSIBLE := $(VENV)/bin/ansible-playbook
 export ANSIBLE_HOME := $(CURDIR)/.ansible
+
+# Terraform EC2 key pair — read from localstack-lab/.env (not repo root .env)
+ifneq ($(SSH_PUBLIC_KEY),)
+  export TF_VAR_ssh_public_key := $(subst ",,$(SSH_PUBLIC_KEY))
+endif
 
 .DEFAULT_GOAL := help
 .PHONY: help up down $(VENV)
@@ -35,8 +42,10 @@ up: $(VENV)
 
 	@echo "=== [3/7] Terraform Altyapısı Dağıtılıyor ==="
 	@mkdir -p $(TF_DIR)/generated
-	@export TF_VAR_ssh_public_key=$$(grep SSH_PUBLIC_KEY ../.env | cut -d '=' -f2 | tr -d '"'); \
-	$(TF) init -input=false && $(TF) apply -auto-approve
+	@test -n "$(TF_VAR_ssh_public_key)" || (echo "HATA: localstack-lab/.env içinde SSH_PUBLIC_KEY tanımlı değil."; exit 1)
+	@test "$${TF_VAR_ssh_public_key#ssh-}" != "$$TF_VAR_ssh_public_key" || (echo "HATA: SSH_PUBLIC_KEY geçerli OpenSSH formatında değil (ssh-rsa / ssh-ed25519 ile başlamalı)."; exit 1)
+	$(TF) init -input=false
+	$(TF) apply -auto-approve
 
 	@echo "=== [4/7] Docker İmajları Derleniyor (Ansible Build) ==="
 	@cd ansible && ../$(ANSIBLE) deploy.yml -e deploy_mode=cpu --tags build
